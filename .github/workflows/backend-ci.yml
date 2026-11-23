@@ -1,0 +1,118 @@
+name: Backend CI
+on:
+  push:
+    branches: [backend, feat/nothing-marketplace-springboot]
+  pull_request:
+    branches: [backend]
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: nothing
+          POSTGRES_USER: nothing
+          POSTGRES_PASSWORD: ci-only-not-production
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U nothing -d nothing"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 15
+    env:
+      DATABASE_URL: jdbc:postgresql://localhost:5432/nothing
+      DATABASE_USER: nothing
+      DATABASE_PASSWORD: ci-only-not-production
+      JWT_SECRET: Y2ktdGVzdC1rZXktb25seS1mb3Itbm90aGluZy1iYWNrZW5kLTEyMzQ1Njc4OTA=
+      KAFKA_BOOTSTRAP_SERVERS: localhost:9092
+      SEED_COFFEE_CATALOG: 'false'
+      SPRING_KAFKA_LISTENER_AUTO_STARTUP: 'false'
+      SPRING_RABBITMQ_LISTENER_SIMPLE_AUTO_STARTUP: 'false'
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate both Docker Compose deployment profiles
+        env:
+          LOCAL_DB_PASSWORD: ci-only-not-production
+          RABBITMQ_PASSWORD: ci-only-not-production
+          GRAFANA_ADMIN_PASSWORD: ci-only-not-production
+          AIVEN_PG_JDBC_URL: jdbc:postgresql://example.invalid:5432/defaultdb?sslmode=require
+          AIVEN_PG_USER: avnadmin
+          AIVEN_PG_PASSWORD: ci-only-not-production
+          AIVEN_KAFKA_BOOTSTRAP: example.invalid:9092
+          AIVEN_KAFKA_SASL_JAAS_CONFIG: 'org.apache.kafka.common.security.scram.ScramLoginModule required username="ci" password="ci-only";'
+          AIVEN_OPENSEARCH_URL: https://example.invalid:9200
+          AIVEN_OPENSEARCH_USER: avnadmin
+          AIVEN_OPENSEARCH_PASSWORD: ci-only-not-production
+        run: |
+          docker compose -f backend/compose.yml config --quiet
+          docker compose -f backend/compose.aiven.yml config --quiet
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+      - name: Validate frontend JavaScript
+        run: |
+          node --check nothing-coffee/app.js
+          node --check nothing-coffee/backend.js
+      - name: Validate marketplace frontend integration
+        run: |
+          python3 - <<'PY'
+          from html.parser import HTMLParser
+          from pathlib import Path
+          import re
+          class IdParser(HTMLParser):
+              def __init__(self): super().__init__(); self.ids=set()
+              def handle_starttag(self, tag, attrs):
+                  attrs=dict(attrs)
+                  if 'id' in attrs: self.ids.add(attrs['id'])
+          html=Path('nothing-coffee/index.html').read_text()
+          parser=IdParser();parser.feed(html)
+          js=Path('nothing-coffee/app.js').read_text()
+          ids=set(re.findall(r"\\$\\('([a-zA-Z0-9_-]+)'\\)",js))
+          missing=ids-parser.ids
+          assert not missing, 'Missing DOM IDs: '+str(missing)
+          assert 'brandFilter' in parser.ids
+          rows=[s for s in Path('backend/src/main/resources/catalog/marketplace-v2.tsv').read_text().splitlines() if s and not s.startswith('#')]
+          assert len(rows)>=56
+          brands={r.split('|')[1] for r in rows}
+          assert len(brands)>=20
+          print('Marketplace frontend IDs and demo catalog validated:',len(rows),'items,',len(brands),'brands')
+          PY
+      - name: Validate benchmark and Aiven scripts
+        run: |
+          python3 -m py_compile scripts/load-marketplace.py scripts/setup-gmail-oauth.py backend/scripts/verify-aiven.py
+          bash -n scripts/chaos-marketplace.sh
+          python3 backend/scripts/verify-aiven.py --help >/dev/null
+          python3 scripts/load-marketplace.py --help >/dev/null
+      - name: Check HA Docker profiles and test script syntax
+        env:
+          LOCAL_DB_PASSWORD: ci-only-not-production
+          RABBITMQ_PASSWORD: ci-only-not-production
+          GRAFANA_ADMIN_PASSWORD: ci-only-not-production
+          JWT_SECRET: Y2ktdGVzdC1rZXktb25seS1mb3Itbm90aGluZy1iYWNrZW5kLTEyMzQ1Njc4OTA=
+          FRONTEND_URL: https://example.invalid/
+          TLS_CERT_PATH: /tmp/example-cert.pem
+          TLS_KEY_PATH: /tmp/example-key.pem
+          AIVEN_PG_CA_PATH: /tmp/example-aiven-pg-ca.pem
+          AIVEN_PG_JDBC_URL: jdbc:postgresql://example.invalid:5432/defaultdb?sslmode=require
+          AIVEN_PG_USER: avnadmin
+          AIVEN_PG_PASSWORD: ci-only-not-production
+          AIVEN_KAFKA_BOOTSTRAP: example.invalid:9092
+          AIVEN_KAFKA_SASL_JAAS_CONFIG: 'org.apache.kafka.common.security.scram.ScramLoginModule required username="ci" password="ci-only";'
+          AIVEN_OPENSEARCH_URL: https://example.invalid:9200
+          AIVEN_OPENSEARCH_USER: avnadmin
+          AIVEN_OPENSEARCH_PASSWORD: ci-only-not-production
+        run: |
+          docker compose -f backend/compose.ha.yml config --quiet
+          docker compose -f backend/compose.aiven.ha.yml config --quiet
+          python3 -m py_compile backend/scripts/validate-ha-env.py
+          bash -n scripts/verify-round-robin.sh
+      - name: Maven compile and tests
+        working-directory: backend
+        run: mvn -B clean verify

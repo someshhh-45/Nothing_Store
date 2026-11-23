@@ -1,0 +1,15 @@
+.env
+.env.*
+!.env.example
+target/
+.idea/
+.vscode/
+*.log
+*.pem
+*.key
+*.jks
+images/
+.terraform/
+*.tfstate
+*.tfstate.*
+terraform.tfvars

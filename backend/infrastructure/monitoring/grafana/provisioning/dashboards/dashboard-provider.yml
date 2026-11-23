@@ -1,0 +1,9 @@
+apiVersion: 1
+providers:
+  - name: Nothing backend
+    orgId: 1
+    folder: Nothing
+    type: file
+    disableDeletion: false
+    options:
+      path: /etc/grafana/provisioning/dashboards/json

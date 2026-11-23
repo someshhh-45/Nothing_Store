@@ -1,0 +1,3 @@
+CREATE TABLE IF NOT EXISTS nothing_outbox (id uuid PRIMARY KEY,topic text NOT NULL,event_key text NOT NULL,payload jsonb NOT NULL,created_at timestamptz NOT NULL DEFAULT now(),claimed_at timestamptz,published_at timestamptz);
+CREATE INDEX IF NOT EXISTS nothing_outbox_pending ON nothing_outbox(created_at) WHERE published_at IS NULL;
+CREATE TABLE IF NOT EXISTS nothing_consumed (event_id uuid PRIMARY KEY,processed_at timestamptz NOT NULL DEFAULT now());

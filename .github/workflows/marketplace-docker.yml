@@ -1,0 +1,63 @@
+name: NOTHING Marketplace Docker integration
+on:
+  push:
+    branches: [feat/nothing-marketplace-springboot]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  full-stack:
+    runs-on: ubuntu-latest
+    timeout-minutes: 42
+    steps:
+      - uses: actions/checkout@v4
+      - name: OpenSearch operating-system requirement
+        run: sudo sysctl -w vm.max_map_count=262144
+      - name: Create private disposable test credentials
+        run: |
+          cp backend/.env.example backend/.env
+          python3 - <<'PY'
+          from pathlib import Path
+          import base64, secrets
+          p=Path('backend/.env')
+          values={
+            'LOCAL_DB_PASSWORD': 'ci_pg_42f8d6d7d3c44df2b2',
+            'DATABASE_PASSWORD': 'ci_pg_42f8d6d7d3c44df2b2',
+            'RABBITMQ_PASSWORD': 'ci_rabbit_8b731e103bc743',
+            'GRAFANA_ADMIN_PASSWORD': 'ci_grafana_682a19e91',
+            'JWT_SECRET': base64.b64encode(secrets.token_bytes(48)).decode(),
+            'ADMIN_USERNAME': 'ci-marketplace-admin',
+            'ADMIN_PASSWORD': 'CI_Only_Market_Admin_2026!',
+          }
+          lines=[]
+          for line in p.read_text().splitlines():
+            if '=' in line and not line.lstrip().startswith('#'):
+              k,v=line.split('=',1); line=k+'='+values.get(k,v)
+            lines.append(line)
+          p.write_text('\n'.join(lines)+'\n')
+          PY
+      - name: Docker Compose build and startup
+        run: docker compose -f backend/compose.yml --env-file backend/.env up -d --build
+      - name: Exercise Spring Boot, OpenSearch, messaging, storefront and monitoring
+        run: bash scripts/smoke-marketplace.sh
+      - name: Baseline concurrent read traffic (24 workers, 600 requests)
+        run: python3 scripts/load-marketplace.py --requests 600 --concurrency 24 --p95-ms 3500 --max-error-rate 0.01 --json-out load-results.json
+      - name: Kafka, OpenSearch, RabbitMQ and app failure recovery
+        run: CHAOS_ACK=ci-disposable bash scripts/chaos-marketplace.sh
+      - name: Publish benchmark JSON
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: marketplace-load-results
+          path: load-results.json
+          if-no-files-found: ignore
+      - name: Print failing service logs
+        if: failure()
+        run: docker compose -f backend/compose.yml --env-file backend/.env logs --tail=180 app frontend postgres kafka opensearch rabbitmq prometheus grafana
+      - name: Clean disposable CI containers
+        if: always()
+        run: docker compose -f backend/compose.yml --env-file backend/.env down -v --remove-orphans

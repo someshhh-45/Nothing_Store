@@ -1,0 +1,80 @@
+name: NOTHING Marketplace three-replica round robin CI
+on:
+  push:
+    branches: [feat/nothing-marketplace-springboot]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  multi-replica:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - name: Raise OpenSearch mmap limit
+        run: sudo sysctl -w vm.max_map_count=262144
+      - name: Create disposable private credentials
+        run: |
+          cp backend/.env.example backend/.env
+          python3 - <<'PY'
+          from pathlib import Path
+          import base64,secrets
+          p=Path("backend/.env")
+          values={
+            "LOCAL_DB_PASSWORD":"ci_ha_pg_f42d1b740c4e",
+            "DATABASE_PASSWORD":"ci_ha_pg_f42d1b740c4e",
+            "RABBITMQ_PASSWORD":"ci_ha_rabbit_869f4dfd",
+            "GRAFANA_ADMIN_PASSWORD":"ci_ha_grafana_85a20",
+            "JWT_SECRET":base64.b64encode(secrets.token_bytes(48)).decode(),
+            "ADMIN_USERNAME":"ci-ha-admin",
+            "ADMIN_PASSWORD":"CI_HA_ADMIN_Only_2026_Strong!"
+          }
+          lines=[]
+          for line in p.read_text().splitlines():
+            if "=" in line and not line.lstrip().startswith("#"):
+              k,v=line.split("=",1);line=k+"="+values.get(k,v)
+            lines.append(line)
+          lines.append("SEED_RETAIL_CATALOG=true")
+          p.write_text("\n".join(lines)+"\n")
+          PY
+      - name: Validate replica Compose profile
+        run: docker compose -f backend/compose.ha.yml --env-file backend/.env config --quiet
+      - name: Initialize a single replica before scaling
+        run: docker compose -f backend/compose.ha.yml --env-file backend/.env up -d --build --scale app=1
+      - name: Wait for seeded database catalog
+        run: |
+          for i in $(seq 1 70); do
+            if curl -fsS --max-time 12 http://127.0.0.1:8000/api/store/catalog |
+              python3 -c 'import json,sys;assert len(json.load(sys.stdin))>=100' 2>/dev/null; then
+              echo "PASS: seeded single-replica catalog"
+              exit 0
+            fi
+            sleep 4
+          done
+          docker compose -f backend/compose.ha.yml --env-file backend/.env logs --tail=120 app frontend
+          exit 1
+      - name: Scale horizontally to three Spring Boot replicas
+        run: |
+          docker compose -f backend/compose.ha.yml --env-file backend/.env up -d --no-build --scale app=3
+          docker compose -f backend/compose.ha.yml --env-file backend/.env ps
+      - name: Verify round-robin, JWT consistency and one-replica failover
+        run: bash scripts/verify-round-robin.sh
+      - name: Load benchmark via three-replica Nginx
+        run: python3 scripts/load-marketplace.py --requests 600 --concurrency 24 --p95-ms 7000 --max-error-rate 0.01 --json-out ha-load-results.json
+      - name: Upload benchmark metrics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: marketplace-ha-load-results
+          path: ha-load-results.json
+          if-no-files-found: ignore
+      - name: Print failing service logs
+        if: failure()
+        run: docker compose -f backend/compose.ha.yml --env-file backend/.env logs --tail=200 app frontend postgres kafka opensearch rabbitmq
+      - name: Remove disposable CI services and volumes
+        if: always()
+        run: docker compose -f backend/compose.ha.yml --env-file backend/.env down -v --remove-orphans
