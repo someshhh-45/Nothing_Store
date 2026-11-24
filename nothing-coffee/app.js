@@ -389,9 +389,43 @@ function showDialog(title,fields,button='CONTINUE'){
   const actions=document.createElement('div');actions.className='actions';
   const cancel=document.createElement('button');cancel.type='button';cancel.textContent='CANCEL';
   const submit=document.createElement('button');submit.type='submit';submit.textContent=button;actions.append(cancel,submit);form.append(actions);root.append(form);
+  if(title==='DELIVERY ADDRESS'){
+   const rules={
+    pincode:{test:value=>/^[1-9][0-9]{5}$/.test(value),valid:'✓ Valid six-digit PIN format',invalid:'Enter a six-digit PIN starting with 1–9'},
+    phoneNumber:{test:value=>/^[6-9][0-9]{9}$/.test(value),valid:'✓ Valid ten-digit mobile format',invalid:'Enter 10 digits starting with 6, 7, 8 or 9'}
+   };
+   const validate=()=>{
+    let allValid=true;
+    for(const [name,rule] of Object.entries(rules)){
+     const input=inputs[name],value=input.value.trim(),filled=value.length>0,valid=rule.test(value);
+     input.classList.toggle('field-valid',filled&&valid);
+     input.classList.toggle('field-invalid',filled&&!valid);
+     input.setAttribute('aria-invalid',String(filled&&!valid));
+     const hint=input.nextElementSibling;
+     hint.textContent=filled?(valid?rule.valid:rule.invalid):'';
+     hint.className='field-feedback'+(filled?(valid?' is-valid':' is-invalid'):'');
+     if(!valid)allValid=false;
+    }
+    submit.disabled=!allValid;
+   };
+   for(const name of Object.keys(rules)){
+    const input=inputs[name];
+    input.inputMode='numeric';
+    input.maxLength=name==='pincode'?6:10;
+    input.autocomplete=name==='pincode'?'postal-code':'tel-national';
+    const hint=document.createElement('small');
+    hint.className='field-feedback';hint.setAttribute('aria-live','polite');
+    hint.id='address-'+name+'-feedback';
+    input.setAttribute('aria-describedby',hint.id);
+    input.after(hint);
+    input.addEventListener('input',validate);
+    input.addEventListener('blur',validate);
+   }
+   validate();
+  }
   let finished=false;const end=value=>{if(finished)return;finished=true;dialog.close();resolve(value)};
   cancel.onclick=()=>end(null);dialog.oncancel=e=>{e.preventDefault();end(null)};
-  form.onsubmit=e=>{e.preventDefault();const data={};for(const [name,input] of Object.entries(inputs))data[name]=input.value.trim();if(consentedCoordinates)Object.assign(data,consentedCoordinates);end(data)};
+  form.onsubmit=e=>{e.preventDefault();if(submit.disabled||!form.reportValidity())return;const data={};for(const [name,input] of Object.entries(inputs))data[name]=input.value.trim();if(consentedCoordinates)Object.assign(data,consentedCoordinates);end(data)};
   dialog.showModal();Object.values(inputs)[0]?.focus();
  });
 }
@@ -840,7 +874,7 @@ async function selectDeliveryAddress(addresses){
   for(const a of addresses){
    const b=document.createElement('button');b.type='button';b.className='address-option';
    b.textContent=[a.buildingName,a.street,a.city,a.state,a.pincode,a.phoneNumber?('☎ '+a.phoneNumber):'MOBILE NUMBER REQUIRED'].filter(Boolean).join(' · ');
-   b.disabled=!/^[6-9][0-9]{9}$/.test(a.phoneNumber||'');b.onclick=()=>done(a);list.append(b);
+   b.disabled=!/^[6-9][0-9]{9}$/.test(a.phoneNumber||'')||!/^[1-9][0-9]{5}$/.test(a.pincode||'');if(b.disabled)b.title='This address needs a valid PIN and mobile number. Add a new address.';b.onclick=()=>done(a);list.append(b);
   }
   const add=document.createElement('button');add.type='button';add.className='primary-choice';
   add.textContent='+ ADD A NEW ADDRESS';add.onclick=()=>done(null);root.append(add);
