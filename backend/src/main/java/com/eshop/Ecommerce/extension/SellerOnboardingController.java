@@ -19,10 +19,11 @@ public class SellerOnboardingController {
  private final RoleRepository roles;
  private final UserRepository users;
  private final AuthUtil auth;
+ private final DomainEvents events;
 
  public SellerOnboardingController(SellerProfileRepository profiles,ProductRepo products,
-    RoleRepository roles,UserRepository users,AuthUtil auth){
-  this.profiles=profiles;this.products=products;this.roles=roles;this.users=users;this.auth=auth;
+    RoleRepository roles,UserRepository users,AuthUtil auth,DomainEvents events){
+  this.profiles=profiles;this.products=products;this.roles=roles;this.users=users;this.auth=auth;this.events=events;
  }
  public record ApplyRequest(@NotBlank @Size(min=3,max=120) String businessName,
    @NotBlank @Pattern(regexp="[6-9][0-9]{9}") String contactPhone,
@@ -114,6 +115,7 @@ public class SellerOnboardingController {
    throw new ResponseStatusException(HttpStatus.CONFLICT,"Only pending listings may be reviewed");
   p.setListingStatus(status);p.setListingReviewNote(decision.note());
   products.save(p);
+  events.record("PRODUCT_CHANGED",p.getProductId(),null);
   return Map.of("productId",p.getProductId(),"status",status);
  }
 }
