@@ -17,6 +17,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends curl \
     && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 COPY --from=build /workspace/target/*.jar /app/app.jar
+# Named Docker volumes inherit directory permissions from the image.
+RUN mkdir -p /app/product-uploads && chown 10001:10001 /app/product-uploads
 USER 10001:10001
 EXPOSE 8080 8081
 ENTRYPOINT ["java","-jar","/app/app.jar"]
