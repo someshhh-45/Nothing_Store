@@ -368,6 +368,7 @@ function showDialog(title,fields,button='CONTINUE'){
    const label=document.createElement('label');label.textContent=f.label;const input=document.createElement('input');
    input.name=f.name;input.required=f.required!==false;input.type=f.type||'text';input.placeholder=f.placeholder||'';input.autocomplete=f.autocomplete||'off';
    if(f.minLength)input.minLength=f.minLength;
+   if(f.type==='file')input.accept=f.accept||'image/png,image/jpeg';
    label.append(input);form.append(label);inputs[f.name]=input;
   }
   if(title==='DELIVERY ADDRESS'){
@@ -425,7 +426,7 @@ function showDialog(title,fields,button='CONTINUE'){
   }
   let finished=false;const end=value=>{if(finished)return;finished=true;dialog.close();resolve(value)};
   cancel.onclick=()=>end(null);dialog.oncancel=e=>{e.preventDefault();end(null)};
-  form.onsubmit=e=>{e.preventDefault();if(submit.disabled||!form.reportValidity())return;const data={};for(const [name,input] of Object.entries(inputs))data[name]=input.value.trim();if(consentedCoordinates)Object.assign(data,consentedCoordinates);end(data)};
+  form.onsubmit=e=>{e.preventDefault();if(submit.disabled||!form.reportValidity())return;const data={};for(const [name,input] of Object.entries(inputs))data[name]=input.type==='file'?(input.files[0]||null):input.value.trim();if(consentedCoordinates)Object.assign(data,consentedCoordinates);end(data)};
   dialog.showModal();Object.values(inputs)[0]?.focus();
  });
 }
@@ -1133,34 +1134,64 @@ async function createInventoryListing(seller){
   const categories=Array.isArray(response.content)?response.content:[];
   const d=$('modal'),root=$('modalContent');if(d.open)d.close();root.replaceChildren();
   const heading=document.createElement('h2');heading.textContent='CHOOSE A PRODUCT CATEGORY';root.append(heading);
+  if(!categories.length){const info=document.createElement('p');info.textContent='No categories available. Ask a store administrator to create one.';root.append(info)}
   for(const category of categories){
    const b=document.createElement('button');b.type='button';b.className='address-option';
    b.textContent=category.categoryName;
    b.onclick=async()=>{
     d.close();
     const fields=[
-     {name:'productName',label:'PRODUCT NAME (MINIMUM 3 CHARACTERS)',placeholder:'Portable Wireless Headphones'},
-     {name:'description',label:'PRODUCT DESCRIPTION (10+ CHARACTERS)',placeholder:'Comfortable Bluetooth headphones with USB-C charging'},
-     {name:'brand',label:'BRAND',placeholder:'NOTHING SELECT'},
-     {name:'city',label:'CITY',placeholder:'Bengaluru'},
+     {name:'productName',label:'PRODUCT NAME (MINIMUM 3 CHARACTERS)',placeholder:'Portable Wireless Headphones',minLength:3},
+     {name:'description',label:'PRODUCT DESCRIPTION (10+ CHARACTERS)',placeholder:'Comfortable Bluetooth headphones with USB-C charging',minLength:10},
+     {name:'brand',label:'BRAND',placeholder:'Your brand'},
+     {name:'city',label:'DISPATCH CITY',placeholder:'Bengaluru'},
      {name:'price',label:'LIST PRICE IN INR',type:'number',placeholder:'1999'},
      {name:'quantity',label:'INITIAL STOCK',type:'number',placeholder:'20'},
-     {name:'image',label:'HTTPS PRODUCT IMAGE URL (OPTIONAL)',required:false,placeholder:'https://...'}
+     ...(seller?[{name:'imageFile',label:'PRODUCT PHOTO (JPG OR PNG · MAX 3 MB)',type:'file',required:false,accept:'image/png,image/jpeg'}]:
+       [{name:'image',label:'HTTPS PRODUCT IMAGE URL (OPTIONAL)',required:false,placeholder:'https://...'}])
     ];
     const input=await showDialog('ADD NEW LISTING',fields,'SAVE PRODUCT');
     if(!input)return;
     const price=Number(input.price),quantity=Number(input.quantity);
-    if(price<=0||!Number.isFinite(price)||!Number.isInteger(quantity)||quantity<0||
-       input.productName.length<3||input.description.length<10||quantity>1000000){
-     notify('Enter a valid name, description, positive price and nonnegative stock.',true);return;
+    if(!Number.isFinite(price)||price<0.01||price>10000000||!Number.isInteger(quantity)||quantity<0||
+       input.productName.length<3||input.productName.length>150||
+       input.description.length<10||input.description.length>2000||
+       !input.brand||input.brand.length>90||!input.city||input.city.length>120||quantity>1000000){
+     notify('Enter a name, description, brand, city, positive price and valid stock.',true);return;
     }
-    if(input.image&&!/^https:\/\//.test(input.image)){notify('Image URLs must use HTTPS.',true);return}
-    const payload={...input,price,quantity,specialPrice:price,discount:0};
+    if(!seller&&input.image&&!input.image.startsWith('https://')){notify('Image URLs must use HTTPS.',true);return}
+    const photo=seller?input.imageFile:null;
+    if(photo&&(photo.size>3*1024*1024||!['image/jpeg','image/png'].includes(photo.type))){
+     notify('Choose a JPG or PNG smaller than 3 MB.',true);return;
+    }
     try{
-     const group=seller?'seller':'admin';
-     await request('/api/'+group+'/categories/'+encodeURIComponent(category.categoryId)+'/product',
-      {method:'POST',body:JSON.stringify(payload)});
-     notify('New listing saved to PostgreSQL.');
+     let productId=null;
+     if(seller){
+      const created=await request('/api/seller/listings',{method:'POST',body:JSON.stringify({
+       categoryId:category.categoryId,productName:input.productName,description:input.description,
+       brand:input.brand,city:input.city,price,quantity
+      })});
+      productId=created.productId;
+     }else{
+      const created=await request('/api/admin/categories/'+encodeURIComponent(category.categoryId)+'/product',{
+       method:'POST',body:JSON.stringify({...input,price,quantity,specialPrice:price,discount:0})
+      });
+      productId=created.productId??created.ProductId;
+     }
+     if(seller&&photo){
+      const formData=new FormData();formData.append('image',photo);
+      try{
+       const res=await fetch('/api/seller/listings/'+encodeURIComponent(productId)+'/image',{
+        method:'POST',credentials:'include',body:formData
+       });
+       const body=await res.json().catch(()=>({}));
+       if(!res.ok)throw new Error(body.message||'HTTP '+res.status);
+      }catch(err){
+       notify('Product saved, but photo upload failed: '+err.message,true);
+       await loadCatalog();await showInventoryPanel(seller);return;
+      }
+     }
+     notify('New product saved to PostgreSQL'+(photo?' with photo':'')+'.');
      await loadCatalog();await showInventoryPanel(seller);
     }catch(e){notify('Product creation failed: '+e.message,true)}
    };
