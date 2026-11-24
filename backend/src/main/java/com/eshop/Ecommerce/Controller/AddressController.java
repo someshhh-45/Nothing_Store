@@ -65,7 +65,7 @@ public class AddressController {
 
     @PutMapping("/addresses/{addressId}")
     public ResponseEntity<AddressDTO> updateAddress(@PathVariable Long addressId
-            , @RequestBody AddressDTO addressDTO){
+            , @Valid @RequestBody AddressDTO addressDTO){
         requireAddressOwner(addressId);
         if((addressDTO.getLatitude()==null)!=(addressDTO.getLongitude()==null))
             throw new org.springframework.web.server.ResponseStatusException(HttpStatus.BAD_REQUEST,"Coordinates must be provided together");
