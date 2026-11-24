@@ -47,6 +47,9 @@ public class CartServiceImpl implements CartService {
         Product product = productRepo.findById(productId)
                 .orElseThrow(() -> new ResourceNotFoundException("Product", "productId", productId));
 
+        if(!"APPROVED".equals(product.getListingStatus()))
+            throw new APIException("Product is not available for purchase");
+
         CartItem cartItem = cartItemRepository.findCartItemByProductIdAndCartId(cart.getCartId(), productId);
 
         if (cartItem != null) {
@@ -160,6 +163,9 @@ public class CartServiceImpl implements CartService {
             throw new APIException("Please, make an order of the " + product.getProductName()
                     + " less than or equal to the quantity " + product.getQuantity() + ".");
         }
+
+        if(!"APPROVED".equals(product.getListingStatus()))
+            throw new APIException("Product is not available for purchase");
 
         CartItem cartItem = cartItemRepository.findCartItemByProductIdAndCartId(cartId, productId);
 
@@ -284,6 +290,8 @@ public class CartServiceImpl implements CartService {
         for(CartItemDTO item:items){
             Product product=productRepo.findById(item.getProductId())
               .orElseThrow(()->new ResourceNotFoundException("Product","productId",item.getProductId()));
+            if(!"APPROVED".equals(product.getListingStatus()))
+                throw new APIException("Product is not available for purchase");
             if(product.getQuantity()==null||product.getQuantity()<item.getQuantity())
               throw new APIException("Insufficient stock for "+product.getProductName());
             CartItem ci=new CartItem();
