@@ -38,6 +38,11 @@ public class Product {
     private double price;
     private double discount;
     private double specialPrice;
+    // Existing catalog items stay approved; newly created seller listings require review.
+    @Column(name="listing_status",nullable=false,length=16)
+    private String listingStatus="APPROVED";
+    @Column(name="listing_review_note",length=500)
+    private String listingReviewNote;
 
     @ManyToOne
     @JoinColumn(name = "category_id")
