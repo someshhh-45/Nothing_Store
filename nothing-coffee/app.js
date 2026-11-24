@@ -368,7 +368,7 @@ function showDialog(title,fields,button='CONTINUE'){
   let consentedCoordinates=null;
   for(const f of fields){
    const label=document.createElement('label');label.textContent=f.label;const input=document.createElement('input');
-   input.name=f.name;input.required=f.required!==false;input.type=f.type||'text';input.placeholder=f.placeholder||'';input.autocomplete=f.autocomplete||'off';
+   input.name=f.name;input.required=f.required!==false;input.type=f.type||'text';input.placeholder=f.placeholder||'';input.autocomplete=f.autocomplete||'off';if(f.value!=null&&f.type!=='file')input.value=String(f.value);
    if(f.minLength)input.minLength=f.minLength;
    if(f.type==='file')input.accept=f.accept||'image/png,image/jpeg';
    label.append(input);form.append(label);inputs[f.name]=input;
@@ -1306,13 +1306,13 @@ async function editSellerProduct(product){
   const categoriesResponse=await request('/api/public/categories?pageNumber=0&pageSize=100');
   const categories=Array.isArray(categoriesResponse.content)?categoriesResponse.content:[];
   const selected=await showDialog('EDIT SELLER PRODUCT',[
-   {name:'productName',label:'PRODUCT NAME',placeholder:product.productName,minLength:3},
-   {name:'description',label:'DESCRIPTION (10–255 CHARACTERS)',placeholder:product.description,minLength:10},
-   {name:'brand',label:'BRAND',placeholder:product.brand},
-   {name:'city',label:'DISPATCH CITY',placeholder:product.city},
-   {name:'categoryId',label:'CATEGORY ID · '+categories.map(x=>x.categoryId+': '+x.categoryName).join(' / '),type:'number',placeholder:String(product.categoryId)},
-   {name:'price',label:'PRICE INR',type:'number',placeholder:String(product.price)},
-   {name:'quantity',label:'AVAILABLE STOCK',type:'number',placeholder:String(product.quantity)}
+   {name:'productName',label:'PRODUCT NAME',value:product.productName,minLength:3},
+   {name:'description',label:'DESCRIPTION (10–255 CHARACTERS)',value:product.description,minLength:10},
+   {name:'brand',label:'BRAND',value:product.brand},
+   {name:'city',label:'DISPATCH CITY',value:product.city},
+   {name:'categoryId',label:'CATEGORY ID · '+categories.map(x=>x.categoryId+': '+x.categoryName).join(' / '),type:'number',value:String(product.categoryId)},
+   {name:'price',label:'PRICE INR',type:'number',value:String(product.price)},
+   {name:'quantity',label:'AVAILABLE STOCK',type:'number',value:String(product.quantity)}
   ],'SUBMIT CHANGES FOR REVIEW');
   if(!selected)return;
   const price=Number(selected.price),quantity=Number(selected.quantity),categoryId=Number(selected.categoryId);
