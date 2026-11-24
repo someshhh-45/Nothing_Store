@@ -1132,7 +1132,8 @@ async function changeInventory(productId,seller,type){
 async function createInventoryListing(seller){
  try{
   const response=await request('/api/public/categories?pageNumber=0&pageSize=100');
-  const categories=Array.isArray(response.content)?response.content:[];
+  const categories=(Array.isArray(response.content)?response.content:[])
+   .filter(category=>!seller||String(category.categoryName||'').toLowerCase()!=='coffee');
   const d=$('modal'),root=$('modalContent');if(d.open)d.close();root.replaceChildren();
   const heading=document.createElement('h2');heading.textContent='CHOOSE A PRODUCT CATEGORY';root.append(heading);
   if(!categories.length){const info=document.createElement('p');info.textContent='No categories available. Ask a store administrator to create one.';root.append(info)}
