@@ -7,6 +7,7 @@ const API='';
 let catalog=[],visible=[],category='All',searchText='',user=null,cart={},cartBusy=false,retailerStatus='NOT_APPLIED',retailerDiscount=0,searchRequestSeq=0,searchDebounce,promoQuote=null,offerList=[],promoRequestSeq=0;
 const productById=id=>catalog.find(p=>String(p.productId)===String(id));
 const itemPrice=p=>retailerStatus==='APPROVED'?Math.round((p.price*(100-retailerDiscount)/100)*100)/100:p.price;
+const safeProductImage=url=>typeof url==='string'&&(/^https:\/\//.test(url)||/^\/uploads\/[a-f0-9-]+\.(?:png|jpg)$/.test(url));
 const escape=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const icons={'Electronics':'🎧','Gadgets':'🔌','Toys & Games':'🧸','Fashion':'👟','Home & Living':'💡','Grocery':'🛒','Beauty':'🧴','Coffee':'☕'};
 const tones={'Electronics':'#e4eae2','Gadgets':'#dce5dd','Toys & Games':'#e8f3d7','Fashion':'#e9e9df','Home & Living':'#f0ebd8','Grocery':'#ecf6db','Beauty':'#ffecf2'};
@@ -76,7 +77,7 @@ function updateCart(){
  $('cartTotal').textContent=money(rawSubtotal);
  renderPromoQuote(rawSubtotal);
  $('cartItems').innerHTML=items.length?items.map(([id,q])=>{
-   const p=productById(id);const thumb=p.image&&/^https:\/\//.test(p.image)?'<img data-product-image="'+escape(id)+'" loading="lazy" src="'+escape(p.image)+'" alt="'+escape(p.name)+'">':chooseIcon(p);return '<div class="cart-row"><div class="cart-icon">'+thumb+'</div><div><strong>'+escape(p.name)+'</strong><small>'+escape(p.variantLabel?('SIZE '+p.variantLabel+' · '):'')+escape(p.category)+' · '+escape(p.city||'India')+'</small><div class="qty"><button type="button" data-qty="'+id+'" data-delta="-1" aria-label="Decrease quantity">−</button><b>'+q+'</b><button type="button" data-qty="'+id+'" data-delta="1" aria-label="Increase quantity">+</button></div></div><div class="cart-price">'+money(itemPrice(p)*q)+'</div></div>';
+   const p=productById(id);const thumb=p.image&&safeProductImage(p.image)?'<img data-product-image="'+escape(id)+'" loading="lazy" src="'+escape(p.image)+'" alt="'+escape(p.name)+'">':chooseIcon(p);return '<div class="cart-row"><div class="cart-icon">'+thumb+'</div><div><strong>'+escape(p.name)+'</strong><small>'+escape(p.variantLabel?('SIZE '+p.variantLabel+' · '):'')+escape(p.category)+' · '+escape(p.city||'India')+'</small><div class="qty"><button type="button" data-qty="'+id+'" data-delta="-1" aria-label="Decrease quantity">−</button><b>'+q+'</b><button type="button" data-qty="'+id+'" data-delta="1" aria-label="Increase quantity">+</button></div></div><div class="cart-price">'+money(itemPrice(p)*q)+'</div></div>';
  }).join(''):'<div class="empty-state"><strong>YOUR BAG IS EMPTY.</strong><p>Some good stuff is waiting for you.</p></div>';
  $('cartSyncStatus').textContent=user?'Saved to your PostgreSQL cart':'Sign in or create an account to add items';
  $('checkoutBtn').disabled=!count||cartBusy;
@@ -129,7 +130,7 @@ function showQuickView(id){
  const title=document.createElement('h2');title.textContent='THE DETAIL / '+(p.brand||'NOTHING SELECT');root.append(title);
  const panel=document.createElement('div');panel.className='quick-panel';
  const picture=document.createElement('div');picture.className='quick-photo';
- if(p.image&&/^https:\/\//.test(p.image)){
+ if(p.image&&safeProductImage(p.image)){
   const img=document.createElement('img');img.src=p.image;img.alt='Illustrative product image: '+(p.variantGroup||p.name);
   img.onerror=()=>{picture.textContent=chooseIcon(p)};picture.append(img);
  }else picture.textContent=chooseIcon(p);
@@ -203,7 +204,7 @@ function drawProducts(){
  $('productGrid').innerHTML=shown.map(p=>{
   const variants=productVariants(p),sized=variants.length>1,stock=variants.reduce((n,v)=>n+Number(v.stock||0),0),safeId=Number(p.productId);
   let image=productArtwork(p);
-  if(p.image&&/^https:\/\//.test(p.image))image='<img data-product-image="'+safeId+'" loading="lazy" decoding="async" src="'+escape(p.image)+'" alt="'+escape(p.variantGroup||p.name)+' — illustrative photography">';
+  if(p.image&&safeProductImage(p.image))image='<img data-product-image="'+safeId+'" loading="lazy" decoding="async" src="'+escape(p.image)+'" alt="'+escape(p.variantGroup||p.name)+' — illustrative photography">';
   const action=stock<1?'SOLD OUT':sized?'CHOOSE SIZE ↗':'ADD TO BAG +';
   return '<article class="product-card"><div class="product-visual" style="--tone:'+(tones[p.category]||'#e7f0ed')+'"><span class="tag">'+(stock>0?'● IN STOCK':'SOLD OUT')+'</span>'+image+
    '<button type="button" class="quick-view" data-quick="'+safeId+'" aria-label="Quick view '+escape(p.variantGroup||p.name)+'">QUICK VIEW ↗</button></div><div class="product-info"><button type="button" class="save-button" data-save="'+safeId+'" aria-label="Save to wishlist">♡ SAVE</button><div class="brand-tag">'+escape(p.brand||'NOTHING SELECT')+'</div><div class="meta"><span>'+escape(p.category)+'</span><span>⌖ '+escape(p.city||'India')+'</span></div><h3>'+escape(p.variantGroup||p.name)+'</h3><p class="description">'+escape(p.description)+'</p><div class="product-bottom"><strong class="price">'+money(itemPrice(p))+'</strong><button class="add-button" data-add="'+safeId+'" '+(stock<1?'disabled':'')+'>'+action+'</button></div></div></article>';
@@ -773,7 +774,7 @@ async function confirmCheckoutDetails(address){
    for(const [id,qty] of entries){
     const p=productById(id),article=document.createElement('article');article.className='checkout-product';
     const artwork=document.createElement('div');artwork.className='checkout-product-photo';
-    if(p.image&&/^https:\/\//.test(p.image)){const img=document.createElement('img');img.src=p.image;img.alt=p.name;img.loading='lazy';artwork.append(img)}
+    if(p.image&&safeProductImage(p.image)){const img=document.createElement('img');img.src=p.image;img.alt=p.name;img.loading='lazy';artwork.append(img)}
     else artwork.textContent=chooseIcon(p);
     const detail=document.createElement('div');detail.className='checkout-product-info';
     const name=document.createElement('strong');name.textContent=p.name;
