@@ -112,7 +112,8 @@ public class ProductController {
     @PostMapping("/seller/categories/{categoryId}/product")
     public ResponseEntity<ProductDTO>addSellersProduct(@Valid  @RequestBody ProductDTO productDTO,
                                                 @PathVariable Long categoryId){
-        ProductDTO savedproductDTO= productService.addProduct(categoryId,productDTO);
-        return ResponseEntity.ok().body(productDTO);
+        // Seller listings must be submitted through the review-aware API;
+        // this legacy route must not publish an approved product directly.
+        return ResponseEntity.status(HttpStatus.GONE).build();
     }
 }
