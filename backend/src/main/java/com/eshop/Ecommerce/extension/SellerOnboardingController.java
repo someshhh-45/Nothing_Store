@@ -89,10 +89,16 @@ public class SellerOnboardingController {
  @Transactional(readOnly=true)
  public List<Map<String,Object>> pendingListings(){
   return products.findByListingStatusOrderByProductIdAsc("PENDING").stream()
-    .map(p->Map.<String,Object>of("productId",p.getProductId(),
-       "productName",p.getProductName(),"seller",p.getUser()==null?"Unknown":p.getUser().getUserName(),
-       "brand",p.getBrand()==null?"":p.getBrand(),"price",p.getSpecialPrice(),
-       "quantity",p.getQuantity(),"status",p.getListingStatus())).toList();
+    .map(p->{
+      Map<String,Object> item=new LinkedHashMap<>();
+      item.put("productId",p.getProductId());item.put("productName",p.getProductName());
+      item.put("seller",p.getUser()==null?"Unknown":p.getUser().getUserName());
+      item.put("brand",p.getBrand());item.put("price",p.getSpecialPrice());
+      item.put("quantity",p.getQuantity());item.put("status",p.getListingStatus());
+      item.put("description",p.getDescription());item.put("image",p.getImage());
+      item.put("category",p.getCategory()==null?"Other":p.getCategory().getCategoryName());
+      return item;
+    }).toList();
  }
  @PutMapping("/api/admin/seller-listings/{id}/review")
  @Transactional
