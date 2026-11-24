@@ -1342,6 +1342,38 @@ async function editSellerProduct(product){
   await loadCatalog();await showInventoryPanel(true);
  }catch(e){notify('Product edit failed: '+e.message,true)}
 }
+async function showSellerOrders(page=0){
+ try{
+  const items=await request('/api/seller/orders?page='+encodeURIComponent(page));
+  const d=$('modal'),root=$('modalContent');if(d.open)d.close();root.replaceChildren();
+  const title=document.createElement('h2');title.textContent='YOUR SELLER ORDERS';root.append(title);
+  const info=document.createElement('p');
+  info.textContent='Only order lines for your own products are shown. Order value includes unpaid COD orders and is not settled revenue.';
+  root.append(info);
+  if(!items.length){const empty=document.createElement('p');empty.textContent='No orders on this page.';root.append(empty)}
+  for(const item of items){
+   const section=document.createElement('section');section.className='review-card';
+   const heading=document.createElement('strong');
+   heading.textContent='ORDER #'+item.orderId+' · '+item.name;
+   const detail=document.createElement('p');
+   detail.textContent=(item.orderDate||'')+' · '+(item.orderStatus||'PLACED')+
+    ' · '+item.quantity+' units · '+money(item.lineTotal);
+   section.append(heading,detail);root.append(section);
+  }
+  const actions=document.createElement('div');actions.className='actions';
+  if(page>0){
+   const prev=document.createElement('button');prev.type='button';prev.textContent='← PREVIOUS';
+   prev.onclick=()=>{d.close();showSellerOrders(page-1)};actions.append(prev);
+  }
+  if(items.length===25){
+   const next=document.createElement('button');next.type='button';next.textContent='NEXT →';
+   next.onclick=()=>{d.close();showSellerOrders(page+1)};actions.append(next);
+  }
+  const back=document.createElement('button');back.type='button';back.textContent='BACK TO SELLER DASHBOARD';
+  back.onclick=()=>{d.close();showInventoryPanel(true)};actions.append(back);
+  root.append(actions);d.showModal();
+ }catch(e){notify('Seller order history unavailable: '+e.message,true)}
+}
 async function showInventoryPanel(seller){
  try{
   const group=seller?'seller':'admin';
@@ -1352,6 +1384,32 @@ async function showInventoryPanel(seller){
   root.append(heading);
   const info=document.createElement('p');info.textContent='Manage stock and discounts directly in PostgreSQL. Listed prices and cart totals are recalculated by Spring Boot.';
   root.append(info);
+  if(seller){
+   const [summary,profile]=await Promise.all([
+    request('/api/seller/summary'),request('/api/seller-applications/me')
+   ]);
+   const stats=document.createElement('div');stats.className='review-card';
+   const label=document.createElement('strong');label.textContent='YOUR SELLER OVERVIEW';
+   const data=document.createElement('p');
+   data.textContent='Listings: '+summary.listings+' · Live: '+summary.approved+
+    ' · Under review: '+summary.pending+' · Rejected: '+summary.rejected+
+    ' · Orders: '+summary.orderCount+' · Units ordered: '+summary.unitsOrdered+
+    ' · Total order value: '+money(summary.orderValue);
+   const warning=document.createElement('p');
+   warning.textContent='Order value includes COD/unpaid orders and is not paid revenue.';
+   stats.append(label,data,warning);root.append(stats);
+   const buttons=document.createElement('div');buttons.className='actions';
+   const orders=document.createElement('button');orders.type='button';
+   orders.textContent='VIEW SELLER ORDERS';orders.onclick=()=>{d.close();showSellerOrders()};
+   const store=document.createElement('button');store.type='button';
+   store.textContent='STORE PROFILE';store.onclick=()=>{
+    d.close();informationModal('YOUR SELLER PROFILE',
+     (profile.businessName||'Legacy seller account')+' · Status: '+(profile.status||'NOT_APPLIED')+
+     (profile.contactPhone?' · Contact: '+profile.contactPhone:'')+
+     (profile.reviewNote?' · Review note: '+profile.reviewNote:''));
+   };
+   buttons.append(orders,store);root.append(buttons);
+  }
   const create=document.createElement('button');create.type='button';create.className='primary-choice';
   create.textContent='+ ADD PRODUCT TO CATALOG';create.onclick=()=>{d.close();createInventoryListing(seller)};
   root.append(create);
@@ -1378,6 +1436,12 @@ async function showInventoryPanel(seller){
     const photo=document.createElement('button');photo.type='button';photo.textContent='UPLOAD PHOTO';
     photo.onclick=()=>{d.close();uploadSellerPhoto(id)};
     actions.append(edit,photo);
+   }
+   if(seller&&safeProductImage(product.image)){
+    const thumbnail=document.createElement('img');thumbnail.src=product.image;
+    thumbnail.alt='Your product image';thumbnail.loading='lazy';
+    thumbnail.style.cssText='display:block;width:110px;height:100px;object-fit:contain;margin:10px 0;background:#fff';
+    row.append(thumbnail);
    }
    row.append(name,desc,actions);root.append(row);
   }
