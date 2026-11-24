@@ -72,6 +72,7 @@ public class OpenSearchCatalog {
      "analysis",Map.of("tokenizer",Map.of("product_ngram_tokenizer",tokenizer),
                         "analyzer",Map.of("product_substring",analyzer)));
   Map<String,Object> fields=new LinkedHashMap<>();
+  fields.put("listingStatus",Map.of("type","keyword"));
   fields.put("productId",Map.of("type","long"));
   fields.put("productName",Map.of("type","text"));
   fields.put("description",Map.of("type","text"));
@@ -97,6 +98,7 @@ public class OpenSearchCatalog {
 
  private void writeDocument(Product product){
   Map<String,Object> doc=new LinkedHashMap<>();
+  doc.put("listingStatus",product.getListingStatus());
   doc.put("productId",product.getProductId());
   doc.put("productName",product.getProductName());
   doc.put("description",product.getDescription());
@@ -162,6 +164,7 @@ public class OpenSearchCatalog {
    throw new IllegalArgumentException("Minimum price exceeds maximum price");
 
   List<Object> filters=new ArrayList<>();
+  filters.add(Map.of("term",Map.of("listingStatus","APPROVED")));
   if(category!=null&&!category.isBlank())filters.add(Map.of("term",Map.of("category",category.trim())));
   if(city!=null&&!city.isBlank())filters.add(Map.of("term",Map.of("city",city.trim())));
   Map<String,Object> range=new LinkedHashMap<>();
