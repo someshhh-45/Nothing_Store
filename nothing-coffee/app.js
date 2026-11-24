@@ -66,8 +66,8 @@ async function request(path,options={}){
  }
  return data;
 }
-function saveGuest(){localStorage.setItem('nothing-guest-cart',JSON.stringify(cart))}
-function readGuest(){try{return JSON.parse(localStorage.getItem('nothing-guest-cart')||'{}')||{}}catch{return {}}}
+// Account carts live in PostgreSQL, not a browser-side guest bag.
+function clearLegacyGuestCart(){localStorage.removeItem('nothing-guest-cart')}
 function updateCart(){
  const items=Object.entries(cart).filter(([id,q])=>Number(q)>0&&productById(id));
  const count=items.reduce((n,[id,q])=>n+Number(q),0);
@@ -78,13 +78,13 @@ function updateCart(){
  $('cartItems').innerHTML=items.length?items.map(([id,q])=>{
    const p=productById(id);const thumb=p.image&&/^https:\/\//.test(p.image)?'<img data-product-image="'+escape(id)+'" loading="lazy" src="'+escape(p.image)+'" alt="'+escape(p.name)+'">':chooseIcon(p);return '<div class="cart-row"><div class="cart-icon">'+thumb+'</div><div><strong>'+escape(p.name)+'</strong><small>'+escape(p.variantLabel?('SIZE '+p.variantLabel+' · '):'')+escape(p.category)+' · '+escape(p.city||'India')+'</small><div class="qty"><button type="button" data-qty="'+id+'" data-delta="-1" aria-label="Decrease quantity">−</button><b>'+q+'</b><button type="button" data-qty="'+id+'" data-delta="1" aria-label="Increase quantity">+</button></div></div><div class="cart-price">'+money(itemPrice(p)*q)+'</div></div>';
  }).join(''):'<div class="empty-state"><strong>YOUR BAG IS EMPTY.</strong><p>Some good stuff is waiting for you.</p></div>';
- $('cartSyncStatus').textContent=user?'Saved to your PostgreSQL cart':'Guest bag saved on this device';
+ $('cartSyncStatus').textContent=user?'Saved to your PostgreSQL cart':'Sign in or create an account to add items';
  $('checkoutBtn').disabled=!count||cartBusy;
  bindImageFallbacks($('cartItems'));
  document.querySelectorAll('[data-qty]').forEach(el=>el.onclick=()=>changeQty(el.dataset.qty,Number(el.dataset.delta)));
 }
 async function persistCart(){
- if(!user){saveGuest();updateCart();return}
+ if(!user)throw new Error('Sign in to save items to your bag');
  cartBusy=true;updateCart();
  try{
   const items=Object.entries(cart).filter(([id,q])=>Number(q)>0).map(([id,quantity])=>({productId:Number(id),quantity:Number(quantity)}));
@@ -94,7 +94,12 @@ async function persistCart(){
  finally{cartBusy=false;updateCart()}
 }
 async function changeQty(id,delta){
- const p=productById(id);if(!p||cartBusy)return;
+ const p=productById(id);if(!p||cartBusy)return false;
+ // The account dialog offers both sign-in and sign-up; cancel never changes the cart.
+ if(!user){
+  notify('Sign in or create an account to add items to your bag.');
+  if(!await login()||!user)return false;
+ }
  const next=Math.max(0,Math.min(99,Number(cart[id]||0)+delta));
  if(next>p.stock){notify('Only '+p.stock+' available right now',true);return}
  const before={...cart};
@@ -308,18 +313,15 @@ async function loadCatalog(attempt=0){
  }
 }
 async function loadServerCart(){
- if(!user){cart=readGuest();updateCart();return}
+ clearLegacyGuestCart();
+ if(!user){cart={};updateCart();return}
  try{
   const carts=await request('/api/carts');
   const server={};
   for(const c of (Array.isArray(carts)?carts:[])){
     for(const p of (c.products||[]))if(p.productId!=null&&p.quantity>0)server[p.productId]=p.quantity;
   }
-  const guest=readGuest();cart=server;
-  if(Object.keys(guest).length){
-    for(const [id,q] of Object.entries(guest))cart[id]=Math.min(99,Number(cart[id]||0)+Number(q||0));
-    await persistCart();localStorage.removeItem('nothing-guest-cart');
-  }
+  cart=server;
   updateCart();await syncPromoQuote();
  }catch(e){cart={};promoQuote=null;updateCart();notify('Could not restore your saved cart: '+e.message,true)}
 }
@@ -459,7 +461,7 @@ async function logout(){
  promoQuote=null;promoRequestSeq++;
  $('sellerInventoryBtn').hidden=true;
  // Do not transfer one customer's bag to the next shopper on the same device.
- localStorage.removeItem('nothing-guest-cart');
+ clearLegacyGuestCart();
  syncAccountButtons();await applyFilters();updateCart();
  notify('Signed out. Your saved account bag remains in PostgreSQL.');
 }
@@ -813,7 +815,7 @@ async function resumeStripeCheckout(){
   try{
    const data=await request('/api/checkout/stripe/status?sessionId='+encodeURIComponent(sessionId));
    if(data.status==='COMPLETED'){
-    cart={};promoQuote=null;promoRequestSeq++;saveGuest();updateCart();
+    cart={};promoQuote=null;promoRequestSeq++;clearLegacyGuestCart();updateCart();
     try{
      const receipt=await request('/api/customer/orders/'+encodeURIComponent(data.orderId)+'/confirmation');
      notify('Stripe payment verified! Order #'+data.orderId+' confirmed. '+(receipt.sendingEnabled?'Confirmation email queued.':'Email sending awaits SMTP setup.'));
@@ -909,7 +911,7 @@ async function checkout(){
     const order=await request('/api/order/users/payments/COD',{method:'POST',body:JSON.stringify({
      addressId:address.addressId,pgName:'COD',pgPaymentId:null,pgStatus:'PENDING',pgResponseMessage:'Cash on delivery'
     })});
-    cart={};promoQuote=null;promoRequestSeq++;saveGuest();updateCart();closeCart();
+    cart={};promoQuote=null;promoRequestSeq++;clearLegacyGuestCart();updateCart();closeCart();
     loadOffers().catch(console.warn);
     try{
      const receipt=await request('/api/customer/orders/'+encodeURIComponent(order.orderId)+'/confirmation');
