@@ -334,6 +334,8 @@ public class ProductServiceImpl implements ProductService {
         existingproduct.setPrice(product.getPrice());
         existingproduct.setSpecialPrice(product.getSpecialPrice());
         existingproduct.setCity(product.getCity());
+        existingproduct.setListingStatus("PENDING");
+        existingproduct.setListingReviewNote(null);
         // save to db
         Product savedProduct=productRepo.save(existingproduct);
         domainEvents.record("PRODUCT_CHANGED", savedProduct.getProductId(), null);
