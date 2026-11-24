@@ -557,6 +557,17 @@ async function adminReviewQueue(seller){
    const desc=document.createElement('p');
    desc.textContent=seller?'Seller registration pending':item.brand+' · '+money(item.price)+' · '+item.quantity+' in stock';
    section.append(title,desc);
+   if(!seller){
+    const detail=document.createElement('p');
+    detail.textContent=(item.category||'Other')+' · '+(item.description||'');
+    section.append(detail);
+    if(safeProductImage(item.image)){
+     const preview=document.createElement('img');preview.src=item.image;
+     preview.alt='Seller product review image';preview.loading='lazy';
+     preview.style.cssText='display:block;width:100%;max-width:200px;height:150px;object-fit:contain;margin:10px 0;background:#fff';
+     section.append(preview);
+    }
+   }
    const actions=document.createElement('div');actions.className='actions';
    for(const decision of ['APPROVED','REJECTED']){
     const action=document.createElement('button');action.type='button';action.textContent=decision==='APPROVED'?'APPROVE':'REJECT';
