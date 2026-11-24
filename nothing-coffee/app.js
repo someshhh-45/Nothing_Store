@@ -1344,7 +1344,7 @@ async function editSellerProduct(product){
 }
 async function showSellerOrders(page=0){
  try{
-  const items=await request('/api/seller/orders?page='+encodeURIComponent(page));
+  const items=await request('/api/seller/dashboard/orders?page='+encodeURIComponent(page));
   const d=$('modal'),root=$('modalContent');if(d.open)d.close();root.replaceChildren();
   const title=document.createElement('h2');title.textContent='YOUR SELLER ORDERS';root.append(title);
   const info=document.createElement('p');
