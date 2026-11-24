@@ -76,3 +76,13 @@
 #modalContent>.primary-choice{margin:12px 0}
 .modal{max-height:90vh;overflow-y:auto}
 @media(max-width:650px){.product-info .save-button{font-size:9px;padding:6px 8px}#modalContent .review-card{padding:12px}}
+
+/* Checkout address: immediate, accessible field-level validation feedback. */
+#modalContent form input.field-valid{border:2px solid #267746;background:#f1fff5}
+#modalContent form input.field-invalid{border:2px solid #c53030;background:#fff4f4}
+#modalContent form input.field-valid:focus-visible{outline-color:#267746}
+#modalContent form input.field-invalid:focus-visible{outline-color:#c53030}
+#modalContent form .field-feedback{display:block;min-height:14px;margin:5px 0 0;font-size:11px;font-weight:700;letter-spacing:0;line-height:1.4}
+#modalContent form .field-feedback.is-valid{color:#176a37}
+#modalContent form .field-feedback.is-invalid{color:#ba1f26}
+#modalContent form .actions button:disabled{opacity:.45;cursor:not-allowed}
