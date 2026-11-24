@@ -19,7 +19,7 @@ public class RetailStoreController {
  }
  @GetMapping("/api/store/catalog")
  public List<Map<String,Object>> catalog(){
-  return products.findAll().stream().filter(p->p.getQuantity()!=null && (p.getCategory()==null || !"Coffee".equalsIgnoreCase(p.getCategory().getCategoryName()))).map(this::publicProduct).toList();
+  return products.findAll().stream().filter(p->p.getQuantity()!=null && "APPROVED".equals(p.getListingStatus()) && (p.getCategory()==null || !"Coffee".equalsIgnoreCase(p.getCategory().getCategoryName()))).map(this::publicProduct).toList();
  }
  private Map<String,Object> publicProduct(Product p){
   Map<String,Object> item=new LinkedHashMap<>();
