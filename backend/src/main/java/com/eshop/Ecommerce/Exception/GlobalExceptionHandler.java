@@ -3,6 +3,7 @@ package com.eshop.Ecommerce.Exception;
 import com.eshop.Ecommerce.Payload.APIResponse;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -12,6 +13,17 @@ import java.util.Map;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+
+    // Preserve intentionally safe, actionable HTTP errors from signup and verification.
+    // In particular, a missing SMTP provider must not become an opaque "503 Service Unavailable".
+    @ExceptionHandler(ResponseStatusException.class)
+    public ResponseEntity<Map<String, Object>> handleResponseStatusException(ResponseStatusException e) {
+        Map<String, Object> body = new HashMap<>();
+        body.put("status", e.getStatusCode().value());
+        body.put("error", e.getStatusCode().toString());
+        body.put("message", e.getReason() == null ? "Request could not be completed" : e.getReason());
+        return ResponseEntity.status(e.getStatusCode()).body(body);
+    }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<Map<String,String> > myMethodArgumentNotValidException(MethodArgumentNotValidException e) {
