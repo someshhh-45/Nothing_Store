@@ -39,7 +39,7 @@ public class SellerDashboardController {
   return result;
  }
 
- @GetMapping("/orders")
+ @GetMapping("/dashboard/orders")
  @Transactional(readOnly=true)
  public List<Map<String,Object>> orders(@RequestParam(defaultValue="0") int page){
   if(page<0||page>1000)throw new org.springframework.web.server.ResponseStatusException(
