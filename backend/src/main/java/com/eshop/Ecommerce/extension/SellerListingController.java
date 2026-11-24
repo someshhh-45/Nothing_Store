@@ -58,6 +58,8 @@ public class SellerListingController {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Price must be finite");
         Category category=categories.findById(input.categoryId())
             .orElseThrow(()->new ResponseStatusException(HttpStatus.BAD_REQUEST,"Choose a valid category"));
+        if("Coffee".equalsIgnoreCase(category.getCategoryName()))
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Choose a marketplace category");
         Product p=new Product();
         p.setCategory(category);
         p.setUser(auth.loggedInUser());
