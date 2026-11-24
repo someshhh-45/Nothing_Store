@@ -1272,7 +1272,7 @@ async function createInventoryListing(seller){
        await loadCatalog();await showInventoryPanel(seller);return;
       }
      }
-     notify('New product saved to PostgreSQL'+(photo?' with photo':'')+'.');
+     notify(seller?'Product submitted for admin review'+(photo?' with photo':'')+'.':'New admin product saved to PostgreSQL.');
      await loadCatalog();await showInventoryPanel(seller);
     }catch(e){notify('Product creation failed: '+e.message,true)}
    };
@@ -1282,11 +1282,60 @@ async function createInventoryListing(seller){
   close.onclick=()=>d.close();root.append(close);d.showModal();
  }catch(e){notify('Categories unavailable: '+e.message,true)}
 }
+async function uploadSellerPhoto(productId){
+ const data=await showDialog('UPLOAD PRODUCT PHOTO',[
+  {name:'image',label:'JPEG OR PNG (MAX 3 MB)',type:'file'}
+ ],'UPLOAD PHOTO');
+ if(!data||!data.image)return;
+ if(data.image.size>3*1024*1024||!['image/png','image/jpeg'].includes(data.image.type)){
+  notify('Choose a PNG or JPEG image smaller than 3 MB.',true);return;
+ }
+ try{
+  const form=new FormData();form.append('image',data.image);
+  const response=await fetch('/api/seller/listings/'+encodeURIComponent(productId)+'/image',{
+   method:'POST',credentials:'include',body:form
+  });
+  const body=await response.json().catch(()=>({}));
+  if(!response.ok)throw new Error(body.message||'Upload failed (HTTP '+response.status+')');
+  notify('Image uploaded. Listing returned to pending review.');
+  await showInventoryPanel(true);
+ }catch(e){notify('Photo upload failed: '+e.message,true)}
+}
+async function editSellerProduct(product){
+ try{
+  const categoriesResponse=await request('/api/public/categories?pageNumber=0&pageSize=100');
+  const categories=Array.isArray(categoriesResponse.content)?categoriesResponse.content:[];
+  const selected=await showDialog('EDIT SELLER PRODUCT',[
+   {name:'productName',label:'PRODUCT NAME',placeholder:product.productName,minLength:3},
+   {name:'description',label:'DESCRIPTION (10–255 CHARACTERS)',placeholder:product.description,minLength:10},
+   {name:'brand',label:'BRAND',placeholder:product.brand},
+   {name:'city',label:'DISPATCH CITY',placeholder:product.city},
+   {name:'categoryId',label:'CATEGORY ID · '+categories.map(x=>x.categoryId+': '+x.categoryName).join(' / '),type:'number',placeholder:String(product.categoryId)},
+   {name:'price',label:'PRICE INR',type:'number',placeholder:String(product.price)},
+   {name:'quantity',label:'AVAILABLE STOCK',type:'number',placeholder:String(product.quantity)}
+  ],'SUBMIT CHANGES FOR REVIEW');
+  if(!selected)return;
+  const price=Number(selected.price),quantity=Number(selected.quantity),categoryId=Number(selected.categoryId);
+  if(!categories.some(x=>x.categoryId===categoryId)||!Number.isFinite(price)||price<.01||price>10000000||
+     !Number.isInteger(quantity)||quantity<0||quantity>1000000||
+     selected.productName.length<3||selected.productName.length>150||
+     selected.description.length<10||selected.description.length>255||
+     !selected.brand||selected.brand.length>90||!selected.city||selected.city.length>120){
+   notify('Enter valid product details, category, price and stock.',true);return;
+  }
+  await request('/api/seller/listings/'+encodeURIComponent(product.productId),{method:'PUT',body:JSON.stringify({
+   productName:selected.productName,description:selected.description,brand:selected.brand,
+   city:selected.city,categoryId,price,quantity
+  })});
+  notify('Changes submitted for admin approval.');
+  await loadCatalog();await showInventoryPanel(true);
+ }catch(e){notify('Product edit failed: '+e.message,true)}
+}
 async function showInventoryPanel(seller){
  try{
   const group=seller?'seller':'admin';
-  const data=await request('/api/'+group+'/products?pageNumber=0&pageSize=50');
-  const products=Array.isArray(data.products)?data.products:[];
+  const data=await request(seller?'/api/seller/listings':'/api/admin/products?pageNumber=0&pageSize=50');
+  const products=seller?(Array.isArray(data)?data:[]):(Array.isArray(data.products)?data.products:[]);
   const d=$('modal'),root=$('modalContent');if(d.open)d.close();root.replaceChildren();
   const heading=document.createElement('h2');heading.textContent=seller?'SELLER INVENTORY':'MARKETPLACE INVENTORY';
   root.append(heading);
@@ -1304,12 +1353,20 @@ async function showInventoryPanel(seller){
    name.textContent=(product.productName??product.ProductName??'Product')+' · SKU #'+id;
    const desc=document.createElement('p');
    desc.textContent='Stock: '+(product.quantity??0)+' · Price: '+money(product.specialPrice??product.price??0)+
-    ' · Discount: '+(product.discount??0)+'%';
+    ' · Discount: '+(product.discount??0)+'%'+(seller?' · Status: '+(product.status||'APPROVED'):'')+
+    (seller&&product.reviewNote?' · Review note: '+product.reviewNote:'');
    const actions=document.createElement('div');actions.className='actions';
    for(const [type,label] of [['stock','SET STOCK'],['discount','SET DISCOUNT']]){
     const b=document.createElement('button');b.type='button';b.textContent=label;
     b.onclick=()=>{d.close();changeInventory(id,seller,type)};
     actions.append(b);
+   }
+   if(seller){
+    const edit=document.createElement('button');edit.type='button';edit.textContent='EDIT LISTING';
+    edit.onclick=()=>{d.close();editSellerProduct(product)};
+    const photo=document.createElement('button');photo.type='button';photo.textContent='UPLOAD PHOTO';
+    photo.onclick=()=>{d.close();uploadSellerPhoto(id)};
+    actions.append(edit,photo);
    }
    row.append(name,desc,actions);root.append(row);
   }
