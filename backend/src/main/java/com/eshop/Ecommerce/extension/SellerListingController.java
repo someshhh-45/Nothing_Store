@@ -50,6 +50,24 @@ public class SellerListingController {
         @NotNull @Min(0) @Max(1000000) Integer quantity
     ) {}
 
+    @GetMapping
+    @Transactional(readOnly=true)
+    public java.util.List<java.util.Map<String,Object>> mine(){
+        var page=products.findByUser(auth.loggedInUser(),org.springframework.data.domain.PageRequest.of(0,100));
+        return page.getContent().stream().map(p->{
+            java.util.Map<String,Object> result=new java.util.LinkedHashMap<>();
+            result.put("productId",p.getProductId());
+            result.put("productName",p.getProductName());
+            result.put("description",p.getDescription());result.put("brand",p.getBrand());
+            result.put("city",p.getCity());result.put("price",p.getPrice());
+            result.put("quantity",p.getQuantity());result.put("image",p.getImage());
+            result.put("discount",p.getDiscount());result.put("specialPrice",p.getSpecialPrice());
+            result.put("categoryId",p.getCategory()==null?null:p.getCategory().getCategoryId());
+            result.put("status",p.getListingStatus());result.put("reviewNote",p.getListingReviewNote());
+            return result;
+        }).toList();
+    }
+
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     @Transactional
