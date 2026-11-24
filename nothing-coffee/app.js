@@ -49,7 +49,21 @@ const notify=(msg,bad=false,action=false)=>{
 async function request(path,options={}){
  const r=await fetch(API+path,{...options,credentials:'include',headers:{'Content-Type':'application/json',...(options.headers||{})}});
  const raw=await r.text();let data;try{data=JSON.parse(raw)}catch{data=raw}
- if(!r.ok)throw new Error((data&&typeof data==='object'&&(data.message||data.error))||('HTTP '+r.status));
+ if(!r.ok){
+  // Preserve actionable server messages (SMTP unavailable, duplicate account,
+  // invalid OTP) rather than displaying an opaque "Account error".
+  const details=data&&typeof data==='object'?data:null;
+  const fieldErrors=details?Object.entries(details)
+   .filter(([key,value])=>!['status','error','message','path','timestamp','type','title','instance'].includes(key)&&typeof value==='string')
+   .map(([field,message])=>field+': '+message):[];
+  const message=details&&typeof details.message==='string'&&details.message.trim()
+   ?details.message:fieldErrors.length?fieldErrors.join('; '):
+    r.status===503?'Email verification is temporarily unavailable. Please try again later.':
+    r.status===409?'This username or email is already in use.':
+    r.status===429?'Too many requests. Please try again later.':
+    'Request failed (HTTP '+r.status+').';
+  throw new Error(message);
+ }
  return data;
 }
 function saveGuest(){localStorage.setItem('nothing-guest-cart',JSON.stringify(cart))}
