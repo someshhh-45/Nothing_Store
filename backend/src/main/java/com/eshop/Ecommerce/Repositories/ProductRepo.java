@@ -29,4 +29,5 @@ public interface ProductRepo extends JpaRepository<Product,Long> , JpaSpecificat
 
 
     Page<Product> findByUser(User user,Pageable pageDetails);
+    java.util.List<Product> findByListingStatusOrderByProductIdAsc(String listingStatus);
 }
