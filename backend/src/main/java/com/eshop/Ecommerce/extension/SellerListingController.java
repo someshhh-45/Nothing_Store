@@ -43,7 +43,7 @@ public class SellerListingController {
     public record CreateListing(
         @NotNull Long categoryId,
         @NotBlank @Size(min=3,max=150) String productName,
-        @NotBlank @Size(min=10,max=2000) String description,
+        @NotBlank @Size(min=10,max=255) String description,
         @NotBlank @Size(max=90) String brand,
         @NotBlank @Size(max=120) String city,
         @NotNull @DecimalMin("0.01") @DecimalMax("10000000.00") Double price,
