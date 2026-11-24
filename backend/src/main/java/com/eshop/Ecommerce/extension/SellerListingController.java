@@ -71,9 +71,35 @@ public class SellerListingController {
         p.setSpecialPrice(input.price());
         p.setQuantity(input.quantity());
         p.setDiscount(0);
+        p.setListingStatus("PENDING");
         Product saved=products.save(p);
         events.record("PRODUCT_CHANGED",saved.getProductId(),null);
-        return Map.of("productId",saved.getProductId(),"message","Product created");
+        return Map.of("productId",saved.getProductId(),"status","PENDING",
+            "message","Product submitted for administrator review");
+    }
+
+    @PutMapping("/{productId}")
+    @Transactional
+    public Map<String,Object> update(@PathVariable Long productId,@Valid @RequestBody CreateListing input){
+        Product p=products.findByIdForInventoryUpdate(productId)
+            .orElseThrow(()->new ResponseStatusException(HttpStatus.NOT_FOUND,"Product not found"));
+        if(p.getUser()==null||!p.getUser().getUserid().equals(auth.loggedInUserId()))
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN,"You may only edit your own products");
+        if(!Double.isFinite(input.price()))
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Price must be finite");
+        Category category=categories.findById(input.categoryId())
+            .orElseThrow(()->new ResponseStatusException(HttpStatus.BAD_REQUEST,"Choose a valid category"));
+        if("Coffee".equalsIgnoreCase(category.getCategoryName()))
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Choose a marketplace category");
+        p.setCategory(category);
+        p.setProductName(input.productName().trim());p.setDescription(input.description().trim());
+        p.setBrand(input.brand().trim());p.setCity(input.city().trim());
+        p.setPrice(input.price());p.setSpecialPrice(input.price());
+        p.setQuantity(input.quantity());p.setDiscount(0);
+        p.setListingStatus("PENDING");p.setListingReviewNote(null);
+        products.save(p);
+        events.record("PRODUCT_CHANGED",p.getProductId(),null);
+        return Map.of("productId",p.getProductId(),"status","PENDING");
     }
 
     @PostMapping(path="/{productId}/image",consumes="multipart/form-data")
@@ -110,6 +136,8 @@ public class SellerListingController {
             if(!ImageIO.write(image,format,target.toFile()))
                 throw new IOException("No image encoder available");
             p.setImage("/uploads/"+filename);
+            p.setListingStatus("PENDING");
+            p.setListingReviewNote(null);
             products.save(p);
             events.record("PRODUCT_CHANGED",p.getProductId(),null);
             return Map.of("productId",p.getProductId(),"image",p.getImage());
