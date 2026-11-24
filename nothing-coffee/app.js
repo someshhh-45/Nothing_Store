@@ -357,6 +357,7 @@ async function loadSession(){
  $('adminInventoryBtn').hidden=!(session?.roles||[]).includes('ROLE_ADMIN');
  $('adminOffersBtn').hidden=!(session?.roles||[]).includes('ROLE_ADMIN');
  $('sellerInventoryBtn').hidden=!(session?.roles||[]).includes('ROLE_SELLER');
+ syncSellerNavigation(session);
  await loadRetailerStatus();await applyFilters();await loadServerCart();
 }
 function showDialog(title,fields,button='CONTINUE'){
@@ -476,6 +477,7 @@ async function login(mode=null){
   $('adminInventoryBtn').hidden=!(session.roles||[]).includes('ROLE_ADMIN');
   $('adminOffersBtn').hidden=!(session.roles||[]).includes('ROLE_ADMIN');
   $('sellerInventoryBtn').hidden=!(session.roles||[]).includes('ROLE_SELLER');
+  syncSellerNavigation(session);
   await loadRetailerStatus();await applyFilters();await loadServerCart();notify('Welcome, '+user+'! Your cart is synced.');
   return true;
  }catch(e){notify('Account error: '+e.message,true);return false}
@@ -497,10 +499,87 @@ async function logout(){
  $('adminOffersBtn').hidden=true;
  promoQuote=null;promoRequestSeq++;
  $('sellerInventoryBtn').hidden=true;
+ syncSellerNavigation(null);
  // Do not transfer one customer's bag to the next shopper on the same device.
  clearLegacyGuestCart();
  syncAccountButtons();await applyFilters();updateCart();
  notify('Signed out. Your saved account bag remains in PostgreSQL.');
+}
+function syncSellerNavigation(session){
+ const roles=session?.roles||[];
+ const seller=roles.includes('ROLE_SELLER'),admin=roles.includes('ROLE_ADMIN');
+ $('sellerApplyBtn').hidden=seller||admin;
+ $('adminSellerAppsBtn').hidden=!admin;
+ $('adminSellerListingsBtn').hidden=!admin;
+}
+async function applyToSell(){
+ if(!user && !await login('LOGIN'))return;
+ try{
+  const status=await request('/api/seller-applications/me');
+  if(status.status==='PENDING'){
+   await informationModal('APPLICATION PENDING','Your seller application is awaiting manual review. Product upload requires approval.');return;
+  }
+  if(status.status==='APPROVED'){
+   await informationModal('SELLER APPROVED','Your seller account is approved. Sign out and sign in again to refresh your access if needed.');return;
+  }
+  const data=await showDialog('BECOME A NOTHING SELLER',[
+   {name:'businessName',label:'BUSINESS / STORE NAME',placeholder:'Your business or store',minLength:3},
+   {name:'contactPhone',label:'CONTACT MOBILE (10 DIGITS)',type:'tel',placeholder:'9876543210',minLength:10},
+   {name:'gstin',label:'GSTIN (OPTIONAL)',required:false,placeholder:'Leave blank if not registered'}
+  ],'SUBMIT APPLICATION');
+  if(!data)return;
+  const gstin=data.gstin.toUpperCase();
+  if(!/^[6-9][0-9]{9}$/.test(data.contactPhone)){notify('Enter a valid Indian mobile number.',true);return}
+  if(gstin&&!/^(0[1-9]|[12][0-9]|3[0-8])[A-Z]{5}[0-9]{4}[A-Z][1-9A-Z]Z[0-9A-Z]$/.test(gstin)){
+   notify('GSTIN format is invalid. Leave it blank if not applicable.',true);return;
+  }
+  await request('/api/seller-applications',{method:'POST',body:JSON.stringify({...data,gstin})});
+  await informationModal('APPLICATION SUBMITTED','Your application is pending administrator review. Seller access is not enabled until approval.');
+ }catch(e){notify('Seller application failed: '+e.message,true)}
+}
+async function adminReviewQueue(seller){
+ try{
+  const url=seller?'/api/admin/seller-applications':'/api/admin/seller-listings';
+  const items=await request(url);
+  const d=$('modal'),root=$('modalContent');if(d.open)d.close();root.replaceChildren();
+  const heading=document.createElement('h2');
+  heading.textContent=seller?'SELLER APPLICATIONS':'PENDING PRODUCT LISTINGS';root.append(heading);
+  const instructions=document.createElement('p');
+  instructions.textContent=seller?'Manually verify business ownership and contact details before approving.':
+   'Check product category, description, seller, image and pricing before publishing.';
+  root.append(instructions);
+  if(!items.length){const empty=document.createElement('p');empty.textContent='Nothing pending.';root.append(empty)}
+  for(const item of items){
+   const section=document.createElement('section');section.className='review-card';
+   const title=document.createElement('strong');
+   title.textContent=seller?item.businessName+' · '+item.contactPhone+(item.gstin?' · GSTIN '+item.gstin:''):
+    item.productName+' · SKU '+item.productId+' · Seller '+item.seller;
+   const desc=document.createElement('p');
+   desc.textContent=seller?'Seller registration pending':item.brand+' · '+money(item.price)+' · '+item.quantity+' in stock';
+   section.append(title,desc);
+   const actions=document.createElement('div');actions.className='actions';
+   for(const decision of ['APPROVED','REJECTED']){
+    const action=document.createElement('button');action.type='button';action.textContent=decision==='APPROVED'?'APPROVE':'REJECT';
+    action.onclick=async()=>{
+     d.close();
+     const extra=await showDialog('ADMIN REVIEW',[
+      {name:'note',label:'REVIEW NOTE',required:decision==='REJECTED',placeholder:'Verification details or rejection reason'}
+     ],decision==='APPROVED'?'CONFIRM APPROVAL':'CONFIRM REJECTION');
+     if(!extra){adminReviewQueue(seller);return}
+     try{
+      await request(url+'/'+encodeURIComponent(seller?item.id:item.productId)+'/review',{
+       method:'PUT',body:JSON.stringify({decision,note:extra.note})});
+      notify('Review decision recorded: '+decision);
+     }catch(e){notify('Review failed: '+e.message,true)}
+     adminReviewQueue(seller);
+    };
+    actions.append(action);
+   }
+   section.append(actions);root.append(section);
+  }
+  const close=document.createElement('button');close.type='button';close.className='outline-button';
+  close.textContent='CLOSE';close.onclick=()=>d.close();root.append(close);d.showModal();
+ }catch(e){notify('Review queue unavailable: '+e.message,true)}
 }
 async function accountAction(){
  if(!user){await login('LOGIN');return}
@@ -1374,6 +1453,9 @@ function bind(){
  $('removeCouponBtn').onclick=removeCouponCode;
  $('couponInput').onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();applyCouponCode($('couponInput').value)}};
  $('sellerInventoryBtn').onclick=()=>showInventoryPanel(true);
+ $('sellerApplyBtn').onclick=applyToSell;
+ $('adminSellerAppsBtn').onclick=()=>adminReviewQueue(true);
+ $('adminSellerListingsBtn').onclick=()=>adminReviewQueue(false);
  $('searchGo').onclick=()=>{searchText=$('search').value.trim();applyFilters();$('catalog').scrollIntoView({behavior:'smooth'})};
  $('search').addEventListener('keydown',e=>{if(e.key==='Enter'){clearTimeout(searchDebounce);$('searchGo').click()}});
  $('search').addEventListener('input',()=>{clearTimeout(searchDebounce);searchDebounce=setTimeout(()=>{searchText=$('search').value.trim();applyFilters()},350)});
@@ -1383,5 +1465,5 @@ function bind(){
  $('clearFilters').onclick=()=>{searchText='';$('search').value='';$('cityFilter').value='';$('priceFilter').value='';$('brandFilter').value='';setCategory('All')};
  document.addEventListener('keydown',e=>{if(e.key==='Escape')closeCart()});
 }
-bind();syncAccountButtons();loadOffers().catch(console.warn);loadCatalog().then(loadSession).then(resumeStripeCheckout);
+bind();syncAccountButtons();syncSellerNavigation(null);loadOffers().catch(console.warn);loadCatalog().then(loadSession).then(resumeStripeCheckout);
 })();
