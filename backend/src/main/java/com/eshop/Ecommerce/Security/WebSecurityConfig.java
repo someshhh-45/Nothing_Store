@@ -63,7 +63,12 @@ public class WebSecurityConfig {
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth ->
                         auth.dispatcherTypeMatchers(jakarta.servlet.DispatcherType.ERROR).permitAll()
-                                .requestMatchers("/api/auth/**").permitAll()
+                                // Only authentication entry points are public. Account directory endpoints
+                                // must not be exposed to anonymous visitors.
+                                .requestMatchers(HttpMethod.POST, "/api/auth/signin", "/api/auth/signup",
+                                        "/api/auth/verify-email", "/api/auth/resend-code", "/api/auth/signout").permitAll()
+                                .requestMatchers(HttpMethod.GET, "/api/auth/username", "/api/auth/user").permitAll()
+                                .requestMatchers(HttpMethod.GET, "/api/auth/seller").hasRole("ADMIN")
                                 .requestMatchers(HttpMethod.POST, "/api/stripe/webhook").permitAll()
                                 .requestMatchers("/api/store/**").permitAll()
                                 .requestMatchers(HttpMethod.GET, "/api/catalog/**").permitAll()

@@ -1,9 +1,9 @@
 name: Backend CI
 on:
   push:
-    branches: [backend, feat/nothing-marketplace-springboot]
+    branches: [main, backend, feat/nothing-marketplace-springboot, codex/auth-registration-hardening]
   pull_request:
-    branches: [backend]
+    branches: [main, backend]
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
