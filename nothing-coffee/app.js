@@ -1156,7 +1156,7 @@ async function createInventoryListing(seller){
     const price=Number(input.price),quantity=Number(input.quantity);
     if(!Number.isFinite(price)||price<0.01||price>10000000||!Number.isInteger(quantity)||quantity<0||
        input.productName.length<3||input.productName.length>150||
-       input.description.length<10||input.description.length>2000||
+       input.description.length<10||input.description.length>255||
        !input.brand||input.brand.length>90||!input.city||input.city.length>120||quantity>1000000){
      notify('Enter a name, description, brand, city, positive price and valid stock.',true);return;
     }
