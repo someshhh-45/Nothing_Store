@@ -31,6 +31,17 @@ class CheckoutAuthenticationTest {
  }
 
  @Test
+ void sellerDirectoryRejectsAnonymousUsers() throws Exception {
+  mvc.perform(get("/api/auth/seller")).andExpect(status().isUnauthorized());
+ }
+
+ @Test
+ @WithMockUser(username="customer", roles="USER")
+ void sellerDirectoryRejectsNonAdminUsers() throws Exception {
+  mvc.perform(get("/api/auth/seller")).andExpect(status().isForbidden());
+ }
+
+ @Test
  @WithMockUser(username="checkout-tester")
  void authenticatedIdentityIsReturned() throws Exception {
   mvc.perform(get("/api/auth/username")).andExpect(status().isOk())
