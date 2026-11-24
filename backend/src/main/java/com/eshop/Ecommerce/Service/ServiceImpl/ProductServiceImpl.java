@@ -81,7 +81,8 @@ public class ProductServiceImpl implements ProductService {
 
         // 5. Build full image URL if image is present
         if (savedProduct.getImage() != null) {
-            responseDTO.setImage(constructImageUrl(savedProduct.getImage()));
+            responseDTO.setImage(savedProduct.getImage().startsWith("/")||savedProduct.getImage().startsWith("https://")?
+                savedProduct.getImage():constructImageUrl(savedProduct.getImage()));
         }
 
         return responseDTO;
@@ -98,7 +99,7 @@ public class ProductServiceImpl implements ProductService {
 
         Pageable pageDetails = PageRequest.of(pageNumber, pageSize, sortByAnyOrder);
         Page<Product> productPage = productRepo.findAll(pageDetails);
-        Specification<Product> spec = Specification.where(null);
+        Specification<Product> spec = (root, query, builder) -> builder.equal(root.get("listingStatus"),"APPROVED");
         if (keyword != null && !keyword.isEmpty()) {
             spec = spec.and((root, query, criteriaBuilder) ->
                     criteriaBuilder.like(criteriaBuilder.lower(root.get("productName")), "%" + keyword.toLowerCase() + "%"));
@@ -139,7 +140,8 @@ public class ProductServiceImpl implements ProductService {
                 : Sort.by(sortBy).descending();
 
         Pageable pageDetails = PageRequest.of(pageNumber, pageSize, sortByAnyOrder);
-        Page<Product> productPage = productRepo.findByCategoryOrderByPriceAsc(category,pageDetails);
+        Page<Product> productPage = productRepo.findAll((root,query,builder) -> builder.and(
+                builder.equal(root.get("category"),category), builder.equal(root.get("listingStatus"),"APPROVED")),pageDetails);
         List<Product> products = productPage.getContent();
         List<ProductDTO> productDTOS=products.stream()
                 .map(product -> modelMapper.map(product,ProductDTO.class))
@@ -161,7 +163,9 @@ public class ProductServiceImpl implements ProductService {
                 : Sort.by(sortBy).descending();
 
         Pageable pageDetails = PageRequest.of(pageNumber, pageSize, sortByAnyOrder);
-        Page<Product> productPage = productRepo.findByProductNameLikeIgnoreCase('%'+keyword+'%',pageDetails);
+        Page<Product> productPage = productRepo.findAll((root,query,builder) -> builder.and(
+                builder.like(builder.lower(root.get("productName")),"%"+keyword.toLowerCase()+"%"),
+                builder.equal(root.get("listingStatus"),"APPROVED")),pageDetails);
         List<Product> products=productPage.getContent();
         List<ProductDTO> productDTOS=products.stream()
                 .map(product -> modelMapper.map(product,ProductDTO.class))
@@ -263,7 +267,9 @@ public class ProductServiceImpl implements ProductService {
         List<ProductDTO> productDTOS = products.stream()
                 .map(product -> {
                     ProductDTO productDTO = modelMapper.map(product, ProductDTO.class);
-                    productDTO.setImage(constructImageUrl(product.getImage()));
+                    if(product.getImage()!=null&&!product.getImage().isBlank())
+                        productDTO.setImage(product.getImage().startsWith("/")||product.getImage().startsWith("https://")?
+                            product.getImage():constructImageUrl(product.getImage()));
                     return productDTO;
                 })
                 .toList();
@@ -294,7 +300,9 @@ public class ProductServiceImpl implements ProductService {
         List<ProductDTO> productDTOS = products.stream()
                 .map(product -> {
                     ProductDTO productDTO = modelMapper.map(product, ProductDTO.class);
-                    productDTO.setImage(constructImageUrl(product.getImage()));
+                    if(product.getImage()!=null&&!product.getImage().isBlank())
+                        productDTO.setImage(product.getImage().startsWith("/")||product.getImage().startsWith("https://")?
+                            product.getImage():constructImageUrl(product.getImage()));
                     return productDTO;
                 })
                 .toList();
