@@ -38,6 +38,7 @@ services:
       RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:?Set RABBITMQ_PASSWORD}
   app:
     build: .
+    volumes: [productuploads:/app/product-uploads]
     ports: ["${APP_HTTP_PORT:-8090}:8080","${APP_METRICS_PORT:-8091}:8081"]
     environment:
       DATABASE_URL: ${DATABASE_URL:-jdbc:postgresql://postgres:5432/nothing}
@@ -91,7 +92,7 @@ services:
     depends_on:
       app:
         condition: service_started
-    volumes: ["../nothing-coffee:/usr/share/nginx/html:ro", "./nginx.conf:/etc/nginx/conf.d/default.conf:ro"]
+    volumes: ["../nothing-coffee:/usr/share/nginx/html:ro", "./nginx.conf:/etc/nginx/conf.d/default.conf:ro", "productuploads:/var/www/product-uploads:ro"]
     ports: ["8000:80"]
   pgadmin:
     image: dpage/pgadmin4:8.14
@@ -117,6 +118,7 @@ services:
     volumes: ["./infrastructure/monitoring/grafana/provisioning:/etc/grafana/provisioning:ro"]
     ports: ["3000:3000"]
 volumes:
+  productuploads:
   pgdata:
   searchdata:
   pgadmindata:
