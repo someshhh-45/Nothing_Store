@@ -14,6 +14,7 @@ public class AddressDTO {
     private String city;
     private String state;
     private String country;
+    @jakarta.validation.constraints.Pattern(regexp="[1-9][0-9]{5}", message="Use a valid six-digit Indian PIN code")
     private String pincode;
     @jakarta.validation.constraints.Pattern(regexp="[6-9][0-9]{9}", message="Use a valid ten-digit Indian mobile number")
     private String phoneNumber;
