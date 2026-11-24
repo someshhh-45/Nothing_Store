@@ -70,8 +70,10 @@ class SellerListingIntegrationTest {
   var picture=new BufferedImage(12,12,BufferedImage.TYPE_INT_RGB);
   assertTrue(ImageIO.write(picture,"png",buffer));
   var upload=new MockMultipartFile("image","product.png","image/png",buffer.toByteArray());
+  String otherName="sl"+unique();
+  users.save(new User(otherName,otherName+"@example.org","unused-hash"));
   mvc.perform(multipart("/api/seller/listings/"+productId+"/image")
-        .file(upload).with(user("other-seller").roles("SELLER")))
+        .file(upload).with(user(otherName).roles("SELLER")))
         .andExpect(status().isForbidden());
   mvc.perform(multipart("/api/seller/listings/"+productId+"/image")
         .file(upload).with(user(name).roles("SELLER")))
