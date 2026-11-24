@@ -13,4 +13,4 @@ create table if not exists seller_profiles (
  review_note varchar(500)
 );
 alter table if exists products add column if not exists listing_status varchar(16) not null default 'APPROVED';
-alter table products add column if not exists listing_review_note varchar(500);
+alter table if exists products add column if not exists listing_review_note varchar(500);
