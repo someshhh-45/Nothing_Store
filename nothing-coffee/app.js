@@ -101,7 +101,7 @@ async function changeQty(id,delta){
   if(!await login()||!user)return false;
  }
  const next=Math.max(0,Math.min(99,Number(cart[id]||0)+delta));
- if(next>p.stock){notify('Only '+p.stock+' available right now',true);return}
+ if(next>p.stock){notify('Only '+p.stock+' available right now',true);return false}
  const before={...cart};
  promoQuote=null;promoRequestSeq++;
  if(next)cart[id]=next;else delete cart[id];
@@ -110,7 +110,8 @@ async function changeQty(id,delta){
   await persistCart();
   if(delta>0&&next>0) notify('Added '+p.name+(p.variantLabel?' / '+p.variantLabel:'')+' to your bag',false,true);
   if(delta<0) notify(next===0?'Removed item from your bag':'Bag updated');
- }catch{cart=before;updateCart()}
+  return true;
+ }catch{cart=before;updateCart();return false}
 }
 async function addItem(id){await changeQty(id,1)}
 function openCart(){$('overlay').hidden=false;$('cartDrawer').classList.add('open');$('cartDrawer').setAttribute('aria-hidden','false')}
