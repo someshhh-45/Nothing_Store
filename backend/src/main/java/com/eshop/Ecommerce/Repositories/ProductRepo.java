@@ -15,7 +15,7 @@ public interface ProductRepo extends JpaRepository<Product,Long> , JpaSpecificat
     @org.springframework.data.jpa.repository.Query("select p from Product p where p.productId=:id")
     java.util.Optional<Product> findByIdForInventoryUpdate(@org.springframework.data.repository.query.Param("id") Long id);
     @org.springframework.data.jpa.repository.Modifying(flushAutomatically = true)
-    @org.springframework.data.jpa.repository.Query("update Product p set p.quantity = p.quantity - :qty where p.productId = :id and p.quantity >= :qty")
+    @org.springframework.data.jpa.repository.Query("update Product p set p.quantity = p.quantity - :qty where p.productId = :id and p.quantity >= :qty and p.listingStatus = 'APPROVED'")
     int reserveStock(@org.springframework.data.repository.query.Param("id") Long id, @org.springframework.data.repository.query.Param("qty") int qty);
 
     @org.springframework.data.jpa.repository.Modifying(flushAutomatically = true)
