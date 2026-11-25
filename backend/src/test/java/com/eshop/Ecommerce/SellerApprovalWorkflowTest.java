@@ -104,4 +104,68 @@ class SellerApprovalWorkflowTest {
      .andExpect(status().isOk()).andExpect(jsonPath("$.status").value("PENDING"));
   assertEquals("PENDING",products.findById(id).orElseThrow().getListingStatus());
  }
+ @Test
+ void matchedOffersUseOwnStockPriceSellerAndRequireReview() throws Exception {
+  User first=makeUser("ma",AppRole.ROLE_SELLER);
+  User second=makeUser("mb",AppRole.ROLE_SELLER);
+  User admin=makeUser("mc",AppRole.ROLE_ADMIN);
+  Category category=new Category();
+  category.setCategoryName("Multi Seller "+unique());
+  category=categories.save(category);
+  Product catalogProduct=new Product();
+  catalogProduct.setCategory(category);
+  catalogProduct.setProductName("Wireless Speaker "+unique());
+  catalogProduct.setDescription("Portable wireless speaker with battery");
+  catalogProduct.setBrand("Example Brand");
+  catalogProduct.setCity("Bengaluru");
+  catalogProduct.setPrice(2999.0);
+  catalogProduct.setSpecialPrice(2999.0);
+  catalogProduct.setQuantity(6);
+  catalogProduct.setUser(first);
+  catalogProduct=products.save(catalogProduct);
+  Long catalogId=catalogProduct.getProductId();
+  var request=Map.of("catalogProductId",catalogId,"city","Chennai","price",2799.0,"quantity",11);
+  var result=mvc.perform(post("/api/seller/listings/match")
+      .with(user(second.getUserName()).roles("SELLER"))
+      .contentType(MediaType.APPLICATION_JSON)
+      .content(json.writeValueAsString(request)))
+      .andExpect(status().isCreated())
+      .andExpect(jsonPath("$.status").value("PENDING"))
+      .andExpect(jsonPath("$.catalogProductId").value(catalogId)).andReturn();
+  long matchId=json.readTree(result.getResponse().getContentAsString()).path("productId").asLong();
+  assertEquals(second.getUserid(),products.findById(matchId).orElseThrow().getUser().getUserid());
+  assertEquals(11,products.findById(matchId).orElseThrow().getQuantity());
+  assertEquals(6,products.findById(catalogId).orElseThrow().getQuantity());
+  mvc.perform(post("/api/seller/listings/match")
+      .with(user(second.getUserName()).roles("SELLER"))
+      .contentType(MediaType.APPLICATION_JSON)
+      .content(json.writeValueAsString(request)))
+      .andExpect(status().isConflict());
+  mvc.perform(post("/api/seller/listings/match")
+      .with(user(first.getUserName()).roles("SELLER"))
+      .contentType(MediaType.APPLICATION_JSON)
+      .content(json.writeValueAsString(request)))
+      .andExpect(status().isConflict());
+  var before=json.readTree(mvc.perform(get("/api/store/catalog")).andExpect(status().isOk())
+      .andReturn().getResponse().getContentAsString());
+  assertFalse(before.findValuesAsText("productId").contains(String.valueOf(matchId)));
+  mvc.perform(put("/api/admin/seller-listings/"+matchId+"/review")
+      .with(user(admin.getUserName()).roles("ADMIN"))
+      .contentType(MediaType.APPLICATION_JSON)
+      .content("{\"decision\":\"APPROVED\"}"))
+      .andExpect(status().isOk());
+  var after=json.readTree(mvc.perform(get("/api/store/catalog")).andExpect(status().isOk())
+      .andReturn().getResponse().getContentAsString());
+  var offer=java.util.stream.StreamSupport.stream(after.spliterator(),false)
+      .filter(node->node.path("productId").asLong()==matchId).findFirst().orElseThrow();
+  assertEquals(catalogId,offer.path("catalogProductId").asLong());
+  assertEquals(second.getUserid(),offer.path("sellerId").asLong());
+  assertEquals(2799.0,offer.path("price").asDouble());
+  assertEquals(11,offer.path("stock").asInt());
+  var original=java.util.stream.StreamSupport.stream(after.spliterator(),false)
+      .filter(node->node.path("productId").asLong()==catalogId).findFirst().orElseThrow();
+  assertEquals(2999.0,original.path("price").asDouble());
+  assertEquals(6,original.path("stock").asInt());
+ }
+
 }
