@@ -1,6 +1,8 @@
 package com.eshop.Ecommerce.extension;
 import com.eshop.Ecommerce.Model.Product;
 import com.eshop.Ecommerce.Repositories.ProductRepo;
+import com.eshop.Ecommerce.Repositories.SellerProfileRepository;
+import com.eshop.Ecommerce.Model.SellerProfile;
 import com.eshop.Ecommerce.Repositories.CategoryRepo;
 import com.eshop.Ecommerce.Repositories.OrderRepo;
 import com.eshop.Ecommerce.Util.AuthUtil;
@@ -13,15 +15,23 @@ import java.util.*;
 @RestController
 public class RetailStoreController {
  private final ProductRepo products;private final CategoryRepo categories;
+ private final SellerProfileRepository sellerProfiles;
  private final OrderRepo orders;private final AuthUtil auth;private final ModelMapper mapper;
- public RetailStoreController(ProductRepo products,CategoryRepo categories,OrderRepo orders,AuthUtil auth,ModelMapper mapper){
- this.products=products;this.categories=categories;this.orders=orders;this.auth=auth;this.mapper=mapper;
+ public RetailStoreController(ProductRepo products,CategoryRepo categories,OrderRepo orders,AuthUtil auth,ModelMapper mapper,SellerProfileRepository sellerProfiles){
+ this.products=products;this.categories=categories;this.orders=orders;this.auth=auth;this.mapper=mapper;this.sellerProfiles=sellerProfiles;
  }
  @GetMapping("/api/store/catalog")
+ @org.springframework.transaction.annotation.Transactional(readOnly=true)
  public List<Map<String,Object>> catalog(){
-  return products.findAll().stream().filter(p->p.getQuantity()!=null && "APPROVED".equals(p.getListingStatus()) && (p.getCategory()==null || !"Coffee".equalsIgnoreCase(p.getCategory().getCategoryName()))).map(this::publicProduct).toList();
+  // Public storefront names come only from approved seller profiles.
+  Map<Long,String> sellerNames=new HashMap<>();
+  for(SellerProfile profile:sellerProfiles.findAll()){
+   if("APPROVED".equals(profile.getStatus()) && profile.getUser()!=null)
+    sellerNames.put(profile.getUser().getUserid(),profile.getBusinessName());
+  }
+  return products.findAll().stream().filter(p->p.getQuantity()!=null && "APPROVED".equals(p.getListingStatus()) && (p.getCategory()==null || !"Coffee".equalsIgnoreCase(p.getCategory().getCategoryName()))).map(p->publicProduct(p,sellerNames)).toList();
  }
- private Map<String,Object> publicProduct(Product p){
+ private Map<String,Object> publicProduct(Product p,Map<Long,String> sellerNames){
   Map<String,Object> item=new LinkedHashMap<>();
   item.put("productId",p.getProductId());item.put("name",p.getProductName());item.put("description",p.getDescription());
   item.put("price",p.getSpecialPrice());item.put("originalPrice",p.getPrice());
@@ -29,7 +39,11 @@ public class RetailStoreController {
   item.put("category",p.getCategory()==null?"Other":p.getCategory().getCategoryName());
   item.put("variantGroup",p.getVariantGroup());item.put("variantLabel",p.getVariantLabel());
   item.put("sizeType",p.getSizeType());item.put("footLengthCm",p.getFootLengthCm());
-  item.put("image",p.getImage());item.put("brand",p.getBrand()==null||p.getBrand().isBlank()?"NOTHING SELECT":p.getBrand());return item;
+  item.put("image",p.getImage());item.put("brand",p.getBrand()==null||p.getBrand().isBlank()?"NOTHING SELECT":p.getBrand());
+  Long sellerId=p.getUser()==null?null:p.getUser().getUserid();
+  item.put("sellerId",sellerId);
+  item.put("sellerName",sellerId==null?"Nothing Market":sellerNames.getOrDefault(sellerId,"Independent seller"));
+  return item;
  }
  @GetMapping("/api/store/categories")
  public List<String> categories(){
