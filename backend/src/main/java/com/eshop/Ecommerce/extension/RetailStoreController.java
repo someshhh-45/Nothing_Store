@@ -41,6 +41,7 @@ public class RetailStoreController {
   item.put("sizeType",p.getSizeType());item.put("footLengthCm",p.getFootLengthCm());
   item.put("image",p.getImage());item.put("brand",p.getBrand()==null||p.getBrand().isBlank()?"NOTHING SELECT":p.getBrand());
   Long sellerId=p.getUser()==null?null:p.getUser().getUserid();
+  item.put("catalogProductId",p.getCatalogProductId()==null?p.getProductId():p.getCatalogProductId());
   item.put("sellerId",sellerId);
   item.put("sellerName",sellerId==null?"Nothing Market":sellerNames.getOrDefault(sellerId,"Independent seller"));
   return item;
