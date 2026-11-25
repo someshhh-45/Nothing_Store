@@ -86,9 +86,13 @@ class SellerApprovalWorkflowTest {
      .content("{\"decision\":\"APPROVED\",\"note\":\"Looks good\"}"))
      .andExpect(status().isOk()).andExpect(jsonPath("$.status").value("APPROVED"));
   assertEquals("APPROVED",products.findById(id).orElseThrow().getListingStatus());
-  assertTrue(json.readTree(mvc.perform(get("/api/store/catalog")).andReturn()
-      .getResponse().getContentAsString()).findValuesAsText("productId")
-      .contains(String.valueOf(id)));
+  var publishedCatalog=json.readTree(mvc.perform(get("/api/store/catalog")).andExpect(status().isOk()).andReturn()
+      .getResponse().getContentAsString());
+  assertTrue(publishedCatalog.findValuesAsText("productId").contains(String.valueOf(id)));
+  var publishedProduct=java.util.stream.StreamSupport.stream(publishedCatalog.spliterator(),false)
+      .filter(node->node.path("productId").asLong()==id).findFirst().orElseThrow();
+  assertEquals("Example Local Seller",publishedProduct.path("sellerName").asText());
+  assertEquals(applicant.getUserid(),publishedProduct.path("sellerId").asLong());
 
   mvc.perform(put("/api/seller/listings/"+id)
      .with(user(applicant.getUserName()).roles("SELLER"))
