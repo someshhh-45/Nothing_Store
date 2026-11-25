@@ -119,7 +119,12 @@ async function addItem(id){await changeQty(id,1)}
 function openCart(){$('overlay').hidden=false;$('cartDrawer').classList.add('open');$('cartDrawer').setAttribute('aria-hidden','false')}
 function closeCart(){$('overlay').hidden=true;$('cartDrawer').classList.remove('open');$('cartDrawer').setAttribute('aria-hidden','true')}
 function productVariants(p){
- if(!p.variantGroup)return [p];
+ if(!p.variantGroup){
+  // Each seller's stock-bearing productId remains distinct through checkout.
+  const id=p.catalogProductId??p.productId;
+  return catalog.filter(x=>(x.catalogProductId??x.productId)===id)
+   .sort((a,b)=>(b.stock>0)-(a.stock>0)||itemPrice(a)-itemPrice(b));
+ }
  const options=catalog.filter(x=>x.variantGroup===p.variantGroup);
  const rank=x=>x.sizeType==='SHOE'?Number(String(x.variantLabel).replace('UK ','')) : ['XS','S','M','L','XL','XXL'].indexOf(x.variantLabel);
  return options.sort((a,b)=>rank(a)-rank(b));
@@ -127,6 +132,7 @@ function productVariants(p){
 function showQuickView(id){
  const p=productById(id);if(!p)return;
  const variants=productVariants(p);let selected=variants.find(v=>v.stock>0)||variants[0];
+ const multipleSellers=!p.variantGroup&&variants.length>1;
  const dialog=$('modal'),root=$('modalContent');root.replaceChildren();
  const title=document.createElement('h2');title.textContent='THE DETAIL / '+(p.brand||'NOTHING SELECT');root.append(title);
  const panel=document.createElement('div');panel.className='quick-panel';
@@ -160,7 +166,19 @@ function showQuickView(id){
    b.setAttribute('aria-pressed',String(v===selected));
   }
  }
- if(variants.length>1){
+ if(multipleSellers){
+  sizeTitle.textContent='CHOOSE YOUR SELLER';
+  for(const offer of variants){
+   const b=document.createElement('button');b.type='button';b.className='size-option seller-offer-option';
+   b.dataset.variant=String(offer.productId);
+   b.textContent=sellerLabel(offer)+' · '+money(itemPrice(offer))+' · '+(offer.stock>0?offer.stock+' in stock':'Sold out')+' · '+(offer.city||'India');
+   b.disabled=offer.stock<1;
+   b.onclick=()=>{selected=offer;renderSelection()};
+   optionButtons.append(b);
+  }
+  sizeGuide.textContent='Each seller sets their own price and stock. The selected seller supplies your order.';
+  optionsWrap.append(sizeTitle,optionButtons,sizeGuide);
+ }else if(variants.length>1){
   sizeTitle.textContent=selected.sizeType==='SHOE'?'CHOOSE SHOE SIZE (UK)':'CHOOSE SIZE';
   for(const v of variants){
    const b=document.createElement('button');b.type='button';
@@ -197,18 +215,19 @@ function showQuickView(id){
 function drawProducts(){
  // Each variant has its own stock-bearing Product ID, but shoppers see one card per design.
  const byGroup=new Map();
- for(const p of visible){const key=p.variantGroup||String(p.productId);
+ for(const p of visible){const key=p.variantGroup||String(p.catalogProductId??p.productId);
   if(!byGroup.has(key))byGroup.set(key,p);
-  else if(Number(byGroup.get(key).stock)<=0&&Number(p.stock)>0)byGroup.set(key,p);
+  else if((Number(byGroup.get(key).stock)<=0&&Number(p.stock)>0)||
+   (Number(p.stock)>0&&Number(byGroup.get(key).stock)>0&&itemPrice(p)<itemPrice(byGroup.get(key))))byGroup.set(key,p);
  }
  const shown=[...byGroup.values()];
  $('resultCount').textContent=shown.length+' ITEM'+(shown.length===1?'':'S')+' IN THIS EDIT';
  $('emptyState').hidden=shown.length>0;
  $('productGrid').innerHTML=shown.map(p=>{
-  const variants=productVariants(p),sized=variants.length>1,stock=variants.reduce((n,v)=>n+Number(v.stock||0),0),safeId=Number(p.productId);
+  const variants=productVariants(p),sized=Boolean(p.variantGroup)&&variants.length>1,multiSeller=!p.variantGroup&&variants.length>1,stock=variants.reduce((n,v)=>n+Number(v.stock||0),0),safeId=Number(p.productId);
   let image=productArtwork(p);
   if(p.image&&safeProductImage(p.image))image='<img data-product-image="'+safeId+'" loading="lazy" decoding="async" src="'+escape(p.image)+'" alt="'+escape(p.variantGroup||p.name)+' — illustrative photography">';
-  const action=stock<1?'SOLD OUT':sized?'CHOOSE SIZE ↗':'ADD TO BAG +';
+  const action=stock<1?'SOLD OUT':sized?'CHOOSE SIZE ↗':multiSeller?'COMPARE SELLERS ↗':'ADD TO BAG +';
   return '<article class="product-card"><div class="product-visual" style="--tone:'+(tones[p.category]||'#e7f0ed')+'"><span class="tag">'+(stock>0?'● IN STOCK':'SOLD OUT')+'</span>'+image+
    '<button type="button" class="quick-view" data-quick="'+safeId+'" aria-label="Quick view '+escape(p.variantGroup||p.name)+'">QUICK VIEW ↗</button></div><div class="product-info"><button type="button" class="save-button" data-save="'+safeId+'" aria-label="Save to wishlist">♡ SAVE</button><div class="brand-tag">'+escape(p.brand||'NOTHING SELECT')+'</div><div class="meta"><span>'+escape(p.category)+'</span><span>⌖ '+escape(p.city||'India')+'</span></div><h3>'+escape(p.variantGroup||p.name)+'</h3><p class="seller-byline">SOLD BY · '+escape(sellerLabel(p))+'</p><p class="description">'+escape(p.description)+'</p><div class="product-bottom"><strong class="price">'+money(itemPrice(p))+'</strong><button class="add-button" data-add="'+safeId+'" '+(stock<1?'disabled':'')+'>'+action+'</button></div></div></article>';
  }).join('');
