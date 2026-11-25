@@ -105,6 +105,16 @@ class SellerApprovalWorkflowTest {
   assertEquals("PENDING",products.findById(id).orElseThrow().getListingStatus());
  }
  @Test
+ void emptySellerDashboardSummaryReturnsZerosInsteadOfCrashing() throws Exception {
+  User seller=makeUser("zs",AppRole.ROLE_SELLER);
+  mvc.perform(get("/api/seller/summary")
+      .with(user(seller.getUserName()).roles("SELLER")))
+      .andExpect(status().isOk())
+      .andExpect(jsonPath("$.orderCount").value(0))
+      .andExpect(jsonPath("$.unitsOrdered").value(0))
+      .andExpect(jsonPath("$.orderValue").value(0.0));
+ }
+ @Test
  void matchedOffersUseOwnStockPriceSellerAndRequireReview() throws Exception {
   User first=makeUser("ma",AppRole.ROLE_SELLER);
   User second=makeUser("mb",AppRole.ROLE_SELLER);
