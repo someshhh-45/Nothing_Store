@@ -20,6 +20,7 @@ import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.nio.file.*;
 import java.util.Locale;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.UUID;
 
@@ -64,8 +65,43 @@ public class SellerListingController {
             result.put("discount",p.getDiscount());result.put("specialPrice",p.getSpecialPrice());
             result.put("categoryId",p.getCategory()==null?null:p.getCategory().getCategoryId());
             result.put("status",p.getListingStatus());result.put("reviewNote",p.getListingReviewNote());
+            result.put("catalogProductId",p.getCatalogProductId());
             return result;
         }).toList();
+    }
+
+    public record MatchListing(@NotNull Long catalogProductId,
+        @NotBlank @Size(max=120) String city,
+        @NotNull @DecimalMin("0.01") @DecimalMax("10000000.00") Double price,
+        @NotNull @Min(0) @Max(1000000) Integer quantity) {}
+
+    @PostMapping("/match")
+    @ResponseStatus(HttpStatus.CREATED)
+    @Transactional
+    public Map<String,Object> matchExisting(@Valid @RequestBody MatchListing input){
+        if(!Double.isFinite(input.price()))
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Price must be finite");
+        Product canonical=products.findById(input.catalogProductId())
+            .orElseThrow(()->new ResponseStatusException(HttpStatus.NOT_FOUND,"Catalog product not found"));
+        if(canonical.getCatalogProductId()!=null || canonical.getVariantGroup()!=null || canonical.getSizeType()!=null ||
+           !"APPROVED".equals(canonical.getListingStatus()) || canonical.getQuantity()==null ||
+           canonical.getCategory()==null || "Coffee".equalsIgnoreCase(canonical.getCategory().getCategoryName()))
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Only approved products without size variants can be matched");
+        Long sellerId=auth.loggedInUserId();
+        if((canonical.getUser()!=null && sellerId.equals(canonical.getUser().getUserid())) ||
+            products.existsByUser_UseridAndCatalogProductId(sellerId,canonical.getProductId()))
+            throw new ResponseStatusException(HttpStatus.CONFLICT,"You already sell this catalog item");
+        Product listing=new Product();
+        listing.setCatalogProductId(canonical.getProductId());
+        listing.setUser(auth.loggedInUser());listing.setCategory(canonical.getCategory());
+        listing.setProductName(canonical.getProductName());listing.setDescription(canonical.getDescription());
+        listing.setBrand(canonical.getBrand());listing.setImage(canonical.getImage());
+        listing.setCity(input.city().trim());listing.setPrice(input.price());listing.setSpecialPrice(input.price());
+        listing.setQuantity(input.quantity());listing.setDiscount(0);listing.setListingStatus("PENDING");
+        Product saved=products.save(listing);
+        events.record("PRODUCT_CHANGED",saved.getProductId(),null);
+        return Map.of("productId",saved.getProductId(),"catalogProductId",canonical.getProductId(),
+            "status","PENDING","message","Seller offer submitted for approval");
     }
 
     @PostMapping
@@ -109,6 +145,17 @@ public class SellerListingController {
             .orElseThrow(()->new ResponseStatusException(HttpStatus.BAD_REQUEST,"Choose a valid category"));
         if("Coffee".equalsIgnoreCase(category.getCategoryName()))
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Choose a marketplace category");
+        if(p.getCatalogProductId()!=null){
+            Product canonical=products.findById(p.getCatalogProductId())
+                .orElseThrow(()->new ResponseStatusException(HttpStatus.CONFLICT,"Original catalog item no longer exists"));
+            if(!"APPROVED".equals(canonical.getListingStatus()))
+                throw new ResponseStatusException(HttpStatus.CONFLICT,"Catalog item is not available");
+            if(!category.getCategoryId().equals(canonical.getCategory().getCategoryId()) ||
+               !input.productName().trim().equals(canonical.getProductName()) ||
+               !input.description().trim().equals(canonical.getDescription()) ||
+               !input.brand().trim().equals(canonical.getBrand()))
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Matched product identity cannot be changed; edit price, stock or dispatch city");
+        }
         p.setCategory(category);
         p.setProductName(input.productName().trim());p.setDescription(input.description().trim());
         p.setBrand(input.brand().trim());p.setCity(input.city().trim());
