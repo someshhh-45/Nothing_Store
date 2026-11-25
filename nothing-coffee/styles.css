@@ -90,3 +90,8 @@
 /* Marketplace seller attribution */
 .seller-byline{font-size:11px;font-weight:800;letter-spacing:.02em;color:#42622d;margin:3px 0 10px;overflow-wrap:anywhere}
 .quick-info .quick-seller{background:#f2f7ea;border-left:3px solid #8cb759;padding:10px 12px;margin:10px 0 15px;color:#294321}
+
+/* Seller Central catalog-match picker and multiple-offer comparisons. */
+.seller-match-results{display:flex;flex-direction:column;gap:7px;max-height:45vh;overflow:auto;margin:14px 0}
+.seller-match-results .address-option{text-align:left}
+.seller-offer-option{display:block;width:100%;text-align:left;white-space:normal;line-height:1.5;margin:6px 0}
