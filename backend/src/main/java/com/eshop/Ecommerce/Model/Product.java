@@ -43,6 +43,10 @@ public class Product {
     private String listingStatus="APPROVED";
     @Column(name="listing_review_note",length=500)
     private String listingReviewNote;
+    // Matched seller listings retain their own productId for cart, stock and order ownership.
+    // Null means this listing itself is the canonical catalog item.
+    @Column(name="catalog_product_id")
+    private Long catalogProductId;
 
     @ManyToOne
     @JoinColumn(name = "category_id")
