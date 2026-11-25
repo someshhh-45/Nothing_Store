@@ -14,7 +14,7 @@ public interface OrderItemRepo extends JpaRepository<OrderItem, Long> {
     @org.springframework.data.jpa.repository.Query(
        "select count(distinct i.order.orderId),coalesce(sum(i.quantity),0L),coalesce(sum(i.orderedProductPrice*i.quantity),0.0) " +
        "from OrderItem i where i.product.user.userid=:sellerId")
-    Object[] sellerOrderStats(@org.springframework.data.repository.query.Param("sellerId") Long sellerId);
+    java.util.List<Object[]> sellerOrderStats(@org.springframework.data.repository.query.Param("sellerId") Long sellerId);
 
     @org.springframework.data.jpa.repository.Query("select count(i) from OrderItem i where lower(i.order.email)=lower(:email) and i.product.productId=:productId")
     long countPurchasedByEmailAndProduct(@org.springframework.data.repository.query.Param("email") String email,
