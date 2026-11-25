@@ -26,7 +26,9 @@ public class SellerDashboardController {
  @Transactional(readOnly=true)
  public Map<String,Object> summary(){
   Long sellerId=auth.loggedInUserId();
-  Object[] sales=orders.sellerOrderStats(sellerId);
+  // Spring Data returns aggregate tuples as a list of rows, even for a single aggregate row.
+  List<Object[]> rows=orders.sellerOrderStats(sellerId);
+  Object[] sales=rows.isEmpty()?new Object[]{0L,0L,0.0}:rows.get(0);
   Map<String,Object> result=new LinkedHashMap<>();
   result.put("listings",products.countByUser_Userid(sellerId));
   result.put("approved",products.countByUser_UseridAndListingStatus(sellerId,"APPROVED"));
