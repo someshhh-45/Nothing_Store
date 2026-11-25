@@ -6,6 +6,7 @@ const money=n=>new Intl.NumberFormat('en-IN',{style:'currency',currency:'INR',ma
 const API='';
 let catalog=[],visible=[],category='All',searchText='',user=null,cart={},cartBusy=false,retailerStatus='NOT_APPLIED',retailerDiscount=0,searchRequestSeq=0,searchDebounce,promoQuote=null,offerList=[],promoRequestSeq=0;
 const productById=id=>catalog.find(p=>String(p.productId)===String(id));
+const sellerLabel=p=>p?.sellerName||'Nothing Market';
 const itemPrice=p=>retailerStatus==='APPROVED'?Math.round((p.price*(100-retailerDiscount)/100)*100)/100:p.price;
 const safeProductImage=url=>typeof url==='string'&&(/^https:\/\//.test(url)||/^\/uploads\/[a-f0-9-]+\.(?:png|jpg)$/.test(url));
 const escape=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -137,6 +138,7 @@ function showQuickView(id){
  const info=document.createElement('div');info.className='quick-info';
  const heading=document.createElement('h3');heading.textContent=p.variantGroup||p.name;
  const desc=document.createElement('p');desc.textContent=p.description;
+ const soldBy=document.createElement('p');soldBy.className='seller-byline quick-seller';
  const stock=document.createElement('p');stock.className='quick-stock';
  const price=document.createElement('strong');price.className='quick-price';
  const optionsWrap=document.createElement('div');optionsWrap.className='size-picker';
@@ -146,6 +148,7 @@ function showQuickView(id){
  const add=document.createElement('button');add.className='primary-choice';
  const close=document.createElement('button');close.className='outline-button';close.textContent='CLOSE';close.onclick=()=>dialog.close();
  function renderSelection(){
+  soldBy.textContent='SOLD BY · '+sellerLabel(selected);
   price.textContent=money(itemPrice(selected));
   stock.textContent=selected.city+' · '+selected.stock+' in stock'+(selected.footLengthCm?' · approx. foot length '+selected.footLengthCm+' cm':'');
   add.textContent=selected.stock>0?'ADD '+selected.variantLabel?.toUpperCase?.()+' TO BAG ↗':'SOLD OUT';
@@ -188,7 +191,7 @@ function showQuickView(id){
  reviews.textContent='READ / WRITE REVIEWS';reviews.onclick=()=>{dialog.close();showReviews(selected.productId)};
  const similar=document.createElement('button');similar.type='button';similar.className='outline-button';
  similar.textContent='SIMILAR PICKS ↗';similar.onclick=()=>{dialog.close();showRecommendations(selected.productId)};
- info.append(heading,desc,optionsWrap,stock,price,details,add,save,reviews,similar,close);panel.append(picture,info);root.append(panel);
+ info.append(heading,desc,soldBy,optionsWrap,stock,price,details,add,save,reviews,similar,close);panel.append(picture,info);root.append(panel);
  renderSelection();dialog.showModal();
 }
 function drawProducts(){
@@ -207,7 +210,7 @@ function drawProducts(){
   if(p.image&&safeProductImage(p.image))image='<img data-product-image="'+safeId+'" loading="lazy" decoding="async" src="'+escape(p.image)+'" alt="'+escape(p.variantGroup||p.name)+' — illustrative photography">';
   const action=stock<1?'SOLD OUT':sized?'CHOOSE SIZE ↗':'ADD TO BAG +';
   return '<article class="product-card"><div class="product-visual" style="--tone:'+(tones[p.category]||'#e7f0ed')+'"><span class="tag">'+(stock>0?'● IN STOCK':'SOLD OUT')+'</span>'+image+
-   '<button type="button" class="quick-view" data-quick="'+safeId+'" aria-label="Quick view '+escape(p.variantGroup||p.name)+'">QUICK VIEW ↗</button></div><div class="product-info"><button type="button" class="save-button" data-save="'+safeId+'" aria-label="Save to wishlist">♡ SAVE</button><div class="brand-tag">'+escape(p.brand||'NOTHING SELECT')+'</div><div class="meta"><span>'+escape(p.category)+'</span><span>⌖ '+escape(p.city||'India')+'</span></div><h3>'+escape(p.variantGroup||p.name)+'</h3><p class="description">'+escape(p.description)+'</p><div class="product-bottom"><strong class="price">'+money(itemPrice(p))+'</strong><button class="add-button" data-add="'+safeId+'" '+(stock<1?'disabled':'')+'>'+action+'</button></div></div></article>';
+   '<button type="button" class="quick-view" data-quick="'+safeId+'" aria-label="Quick view '+escape(p.variantGroup||p.name)+'">QUICK VIEW ↗</button></div><div class="product-info"><button type="button" class="save-button" data-save="'+safeId+'" aria-label="Save to wishlist">♡ SAVE</button><div class="brand-tag">'+escape(p.brand||'NOTHING SELECT')+'</div><div class="meta"><span>'+escape(p.category)+'</span><span>⌖ '+escape(p.city||'India')+'</span></div><h3>'+escape(p.variantGroup||p.name)+'</h3><p class="seller-byline">SOLD BY · '+escape(sellerLabel(p))+'</p><p class="description">'+escape(p.description)+'</p><div class="product-bottom"><strong class="price">'+money(itemPrice(p))+'</strong><button class="add-button" data-add="'+safeId+'" '+(stock<1?'disabled':'')+'>'+action+'</button></div></div></article>';
  }).join('');
  bindImageFallbacks($('productGrid'));
  document.querySelectorAll('[data-add]').forEach(b=>b.onclick=()=>{
