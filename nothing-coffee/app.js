@@ -1241,6 +1241,52 @@ async function changeInventory(productId,seller,type){
   await loadCatalog();await showInventoryPanel(seller);
  }catch(e){notify('Inventory update failed: '+e.message,true)}
 }
+async function matchExistingProduct(){
+ try{
+  await loadCatalog();
+  const products=catalog.filter(p=>(p.catalogProductId??p.productId)===p.productId&&!p.variantGroup&&!p.sizeType);
+  const d=$('modal'),root=$('modalContent');if(d.open)d.close();root.replaceChildren();
+  const heading=document.createElement('h2');heading.textContent='SELL AN EXISTING PRODUCT';root.append(heading);
+  const hint=document.createElement('p');hint.textContent='Choose an existing catalog item. Set your own price, stock and dispatch city. Admin approval is required before customers see your offer.';root.append(hint);
+  const search=document.createElement('input');search.type='search';search.placeholder='Search existing products or brands';search.setAttribute('aria-label','Search products to sell');root.append(search);
+  const list=document.createElement('div');list.className='seller-match-results';root.append(list);
+  function render(){
+   const query=search.value.trim().toLowerCase();
+   const matches=products.filter(p=>(p.name+' '+p.brand).toLowerCase().includes(query)).slice(0,40);
+   list.replaceChildren();
+   if(!matches.length){const empty=document.createElement('p');empty.textContent='No matching products. Use Add New Product instead.';list.append(empty)}
+   for(const p of matches){
+    const b=document.createElement('button');b.type='button';b.className='address-option';
+    b.textContent=p.name+' · '+(p.brand||'')+' · Catalog #'+p.productId;
+    b.onclick=async()=>{
+     d.close();
+     const input=await showDialog('YOUR SELLER OFFER · '+p.name,[
+      {name:'city',label:'DISPATCH CITY',placeholder:'Bengaluru',minLength:2},
+      {name:'price',label:'YOUR SELLING PRICE IN INR',type:'number',placeholder:String(p.price)},
+      {name:'quantity',label:'STOCK AVAILABLE',type:'number',placeholder:'10'}
+     ],'SUBMIT OFFER FOR APPROVAL');
+     if(!input)return;
+     const price=Number(input.price),quantity=Number(input.quantity);
+     if(!input.city.trim()||input.city.length>120||!Number.isFinite(price)||price<.01||price>10000000||
+        !Number.isInteger(quantity)||quantity<0||quantity>1000000){
+      notify('Enter a dispatch city, positive price and valid stock quantity.',true);return;
+     }
+     try{
+      await request('/api/seller/listings/match',{method:'POST',body:JSON.stringify({
+       catalogProductId:p.productId,city:input.city,price,quantity
+      })});
+      notify('Seller offer submitted for admin approval.');
+      await showInventoryPanel(true);
+     }catch(e){notify('Unable to match product: '+e.message,true)}
+    };
+    list.append(b);
+   }
+  }
+  search.oninput=render;render();
+  const close=document.createElement('button');close.type='button';close.className='outline-button';close.textContent='CLOSE';close.onclick=()=>d.close();root.append(close);
+  d.showModal();
+ }catch(e){notify('Could not load matching catalog: '+e.message,true)}
+}
 async function createInventoryListing(seller){
  try{
   const response=await request('/api/public/categories?pageNumber=0&pageSize=100');
@@ -1435,6 +1481,11 @@ async function showInventoryPanel(seller){
   const create=document.createElement('button');create.type='button';create.className='primary-choice';
   create.textContent='+ ADD PRODUCT TO CATALOG';create.onclick=()=>{d.close();createInventoryListing(seller)};
   root.append(create);
+  if(seller){
+   const match=document.createElement('button');match.type='button';match.className='outline-button';
+   match.textContent='SELL AN EXISTING PRODUCT ↗';match.onclick=()=>{d.close();matchExistingProduct()};
+   root.append(match);
+  }
   if(!products.length){const empty=document.createElement('p');empty.textContent='No products found for this account.';root.append(empty)}
   for(const product of products){
    const id=product.productId??product.ProductId;
