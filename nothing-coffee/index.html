@@ -9,8 +9,8 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="styles.css?v=multi-seller-20261125">
-  <link rel="stylesheet" href="checkout-steps.css?v=1"><link rel="stylesheet" href="offers.css?v=1">
-  <script src="app.js?v=seller-fulfillment-20261126" defer></script>
+  <link rel="stylesheet" href="checkout-steps.css?v=1"><link rel="stylesheet" href="offers.css?v=search-cities-coupons-20261126">
+  <script src="app.js?v=search-cities-coupons-20261126" defer></script>
 </head>
 <body>
   <a class="skip-link" href="#catalog">Skip to products</a>
@@ -21,6 +21,18 @@
     <div class="header-right"><button id="retailerBtn" class="nav-button retailer-nav">FOR BUSINESS</button><button id="adminRetailersBtn" class="nav-button" hidden>APPROVALS</button><button id="adminOrdersBtn" class="nav-button" hidden>FULFILLMENT</button><button id="adminRequestsBtn" class="nav-button" hidden>REQUESTS</button><button id="adminInventoryBtn" class="nav-button" hidden>INVENTORY</button><button id="adminOffersBtn" class="nav-button" hidden>OFFERS</button><button id="sellerApplyBtn" class="nav-button">BECOME A SELLER</button><button id="adminSellerAppsBtn" class="nav-button" hidden>SELLER APPLICATIONS</button><button id="adminSellerListingsBtn" class="nav-button" hidden>LISTING REVIEWS</button><button id="sellerInventoryBtn" class="nav-button" hidden>SELLER DASHBOARD</button><button id="signInBtn" class="nav-button login-action">SIGN IN</button><button id="registerBtn" class="nav-button signup-action">JOIN ↗</button><button id="accountBtn" class="nav-button account-action" hidden><span id="accountLabel">ACCOUNT</span></button><button id="logoutBtn" class="nav-button logout-action" hidden>SIGN OUT</button><button id="ordersBtn" class="nav-button">ORDERS</button><button id="wishlistBtn" class="nav-button">SAVED ♡</button><button id="cartBtn" class="cart-launch" aria-label="Open shopping bag">BAG <span id="cartCount">0</span> ↗</button></div>
   </header>
   <nav class="category-nav" aria-label="Shop by category"><a class="nav-all" href="#catalog">THE EDIT / ALL</a><button data-category-nav="Electronics">TECH</button><button data-category-nav="Gadgets">GADGETS</button><button data-category-nav="Fashion">FASHION</button><button data-category-nav="Toys &amp; Games">TOYS &amp; GAMES</button><button data-category-nav="Home &amp; Living">LIVING</button><button data-category-nav="Beauty">BEAUTY</button><a href="#retailers">BUSINESS ↗</a><span class="nav-end">CURATED FOR CURIOUS MINDS <span aria-hidden="true">✳</span></span></nav>
+  <section id="offerTicker" class="offer-ticker" aria-label="Active store promotions" hidden>
+    <div class="offer-ticker-intro">LIVE OFFERS <span aria-hidden="true">✳</span></div>
+    <button id="offerTickerPrev" type="button" class="offer-ticker-nav" aria-label="Previous promotion">‹</button>
+    <div class="offer-ticker-main" aria-live="off">
+      <strong id="offerTickerTitle">Live promotions</strong>
+      <span id="offerTickerCode" class="offer-ticker-code"></span>
+      <small id="offerTickerDetails"></small>
+    </div>
+    <button id="offerTickerUse" type="button" class="offer-ticker-action">SHOP OFFERS ↗</button>
+    <span id="offerTickerCounter" class="offer-ticker-counter" aria-hidden="true"></span>
+    <button id="offerTickerNext" type="button" class="offer-ticker-nav" aria-label="Next promotion">›</button>
+  </section>
   <main>
     <section class="hero" id="home" aria-labelledby="heroTitle">
       <div class="hero-copy"><div class="eyebrow hero-eyebrow"><span class="pulse"></span> INDEPENDENT THINKING / EVERYDAY OBJECTS</div><h1 id="heroTitle"><span>NOTHING</span><span class="outline-title">ORDINARY<span class="period">.</span></span></h1><p>GOOD TASTE. GREAT FINDS. ZERO BORING STUFF. The best-looking edit of tech, fashion, gadgets, toys and everything in between.</p><div class="hero-buttons"><a href="#catalog" class="primary-link">EXPLORE THE COLLECTION <span>↗</span></a><a href="#discover" class="hero-secondary">DISCOVER CATEGORIES ↓</a></div><div class="hero-metrics"><div><strong id="heroProductCount">80+</strong><span>CURATED DEMO FINDS</span></div><div><strong>7</strong><span>COLLECTIONS & COUNTING</span></div><div><strong>01/26</strong><span>THE FIRST DROP</span></div></div></div>
