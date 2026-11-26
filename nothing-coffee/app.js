@@ -58,7 +58,7 @@ function productSearchScore(p,query){
    // Do not confuse FACE with CASE on an earbuds case, even at edit distance 1.
    // Genuine typo examples keep the first letter: FASE -> FACE, WUH -> WASH.
    if(token.length<3||token[0]!==word[0]||Math.abs(word.length-token.length)>1)continue;
-   const maxEdits=token.length<=3?0:token.length<=5?2:2;
+   const maxEdits=token.length>=3?2:0;
    const edits=wordEditDistance(token,word);
    if(edits<=maxEdits)best=Math.min(best,2+edits);
   }
