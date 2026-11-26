@@ -5,10 +5,70 @@ const money=n=>new Intl.NumberFormat('en-IN',{style:'currency',currency:'INR',ma
 // All authenticated API traffic goes through this storefront's Nginx /api proxy.
 const API='';
 let catalog=[],visible=[],category='All',searchText='',user=null,cart={},cartBusy=false,retailerStatus='NOT_APPLIED',retailerDiscount=0,searchRequestSeq=0,searchDebounce,promoQuote=null,offerList=[],promoRequestSeq=0;
+let offerTickerIndex=0,offerTickerTimer=null,photoOwners=new Map();
 const productById=id=>catalog.find(p=>String(p.productId)===String(id));
 const sellerLabel=p=>p?.sellerName||'Nothing Market';
 const itemPrice=p=>retailerStatus==='APPROVED'?Math.round((p.price*(100-retailerDiscount)/100)*100)/100:p.price;
 const safeProductImage=url=>typeof url==='string'&&(/^https:\/\//.test(url)||/^\/uploads\/[a-f0-9-]+\.(?:png|jpg)$/.test(url));
+// Demo photo URLs can appear on different products. Prefer a labelled illustration
+// rather than claiming the same stock photograph is each product's exact photo.
+const productGroupKey=p=>String(p.catalogProductId??p.variantGroup??p.productId);
+const productPhotoKey=url=>String(url||'').split('?')[0];
+function canShowProductPhoto(p){
+ if(!safeProductImage(p.image))return false;
+ const owner=photoOwners.get(productPhotoKey(p.image));
+ return !owner||owner===productGroupKey(p);
+}
+function refreshPhotoOwners(){
+ photoOwners=new Map();
+ for(const p of catalog){
+  if(!safeProductImage(p.image))continue;
+  const key=productPhotoKey(p.image);
+  if(!photoOwners.has(key))photoOwners.set(key,productGroupKey(p));
+ }
+}
+function searchTokens(value){
+ return String(value||'').normalize('NFKD').toLowerCase().split(/[^\p{L}\p{N}]+/u).filter(Boolean);
+}
+function wordEditDistance(a,b){
+ let prev=Array.from({length:b.length+1},(_,i)=>i);
+ for(let i=1;i<=a.length;i++){
+  const next=[i];
+  for(let j=1;j<=b.length;j++)
+   next[j]=Math.min(next[j-1]+1,prev[j]+1,prev[j-1]+(a[i-1]===b[j-1]?0:1));
+  prev=next;
+ }
+ return prev[b.length];
+}
+function localCatalogSearch(items,q){
+ const tokens=searchTokens(q);
+ if(!tokens.length)return items;
+ return items.map(p=>{
+  const words=searchTokens([p.name,p.brand,p.description].join(' '));
+  let score=0;
+  for(const t of tokens){
+   let best=Infinity;
+   for(const w of words){
+    if(w===t){best=0;break}
+    if(w.startsWith(t)||t.startsWith(w)){best=Math.min(best,1);continue}
+    if(Math.abs(w.length-t.length)>2)continue;
+    const edits=wordEditDistance(t,w);
+    if(edits<=2)best=Math.min(best,edits+1);
+   }
+   if(!Number.isFinite(best))return {p,score:Infinity};
+   score+=best;
+  }
+  return {p,score};
+ }).filter(x=>Number.isFinite(x.score)).sort((a,b)=>a.score-b.score).map(x=>x.p);
+}
+function filterCatalogLocally(items,city,range,brand){
+ const [low,high]=range?range.split('-').map(Number):[null,null];
+ return items.filter(p=>(category==='All'||p.category===category) &&
+  (!city||String(p.city||'').trim().toLocaleLowerCase()===city.toLocaleLowerCase()) &&
+  (!range||(Number(p.price)>=low&&Number(p.price)<=high)) &&
+  (!brand||(p.brand||'NOTHING SELECT')===brand));
+}
+
 const escape=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const icons={'Electronics':'🎧','Gadgets':'🔌','Toys & Games':'🧸','Fashion':'👟','Home & Living':'💡','Grocery':'🛒','Beauty':'🧴','Coffee':'☕'};
 const tones={'Electronics':'#e4eae2','Gadgets':'#dce5dd','Toys & Games':'#e8f3d7','Fashion':'#e9e9df','Home & Living':'#f0ebd8','Grocery':'#ecf6db','Beauty':'#ffecf2'};
@@ -137,7 +197,7 @@ function showQuickView(id){
  const title=document.createElement('h2');title.textContent='THE DETAIL / '+(p.brand||'NOTHING SELECT');root.append(title);
  const panel=document.createElement('div');panel.className='quick-panel';
  const picture=document.createElement('div');picture.className='quick-photo';
- if(p.image&&safeProductImage(p.image)){
+ if(p.image&&canShowProductPhoto(p)){
   const img=document.createElement('img');img.src=p.image;img.alt='Illustrative product image: '+(p.variantGroup||p.name);
   img.onerror=()=>{picture.textContent=chooseIcon(p)};picture.append(img);
  }else picture.textContent=chooseIcon(p);
@@ -226,7 +286,7 @@ function drawProducts(){
  $('productGrid').innerHTML=shown.map(p=>{
   const variants=productVariants(p),sized=Boolean(p.variantGroup)&&variants.length>1,multiSeller=!p.variantGroup&&variants.length>1,stock=variants.reduce((n,v)=>n+Number(v.stock||0),0),safeId=Number(p.productId);
   let image=productArtwork(p);
-  if(p.image&&safeProductImage(p.image))image='<img data-product-image="'+safeId+'" loading="lazy" decoding="async" src="'+escape(p.image)+'" alt="'+escape(p.variantGroup||p.name)+' — illustrative photography">';
+  if(p.image&&canShowProductPhoto(p))image='<img data-product-image="'+safeId+'" loading="lazy" decoding="async" src="'+escape(p.image)+'" alt="'+escape(p.variantGroup||p.name)+' — illustrative photography">';
   const action=stock<1?'SOLD OUT':sized?'CHOOSE SIZE ↗':multiSeller?'COMPARE SELLERS ↗':'ADD TO BAG +';
   return '<article class="product-card"><div class="product-visual" style="--tone:'+(tones[p.category]||'#e7f0ed')+'"><span class="tag">'+(stock>0?'● IN STOCK':'SOLD OUT')+'</span>'+image+
    '<button type="button" class="quick-view" data-quick="'+safeId+'" aria-label="Quick view '+escape(p.variantGroup||p.name)+'">QUICK VIEW ↗</button></div><div class="product-info"><button type="button" class="save-button" data-save="'+safeId+'" aria-label="Save to wishlist">♡ SAVE</button><div class="brand-tag">'+escape(p.brand||'NOTHING SELECT')+'</div><div class="meta"><span>'+escape(p.category)+'</span><span>⌖ '+escape(p.city||'India')+'</span></div><h3>'+escape(p.variantGroup||p.name)+'</h3><p class="seller-byline">SOLD BY · '+escape(sellerLabel(p))+'</p><p class="description">'+escape(p.description)+'</p><div class="product-bottom"><strong class="price">'+money(itemPrice(p))+'</strong><button class="add-button" data-add="'+safeId+'" '+(stock<1?'disabled':'')+'>'+action+'</button></div></div></article>';
@@ -257,23 +317,33 @@ async function applyFilters(){
   if(range){params.set('minPrice',String(min));params.set('maxPrice',String(max))}
   $('sourceStatus').textContent='● SEARCHING OPENSEARCH…';
   try{
-   const ids=new Set();let page=0,total=Infinity;
+   const ids=[],seen=new Set();let page=0,total=Infinity;
    while(page<10&&page*100<total){
     params.set('page',String(page));
     const data=await request('/api/search/products?'+params);
     if(sequence!==searchRequestSeq)return;
     const hits=data.hits?.hits||[];
-    for(const hit of hits)ids.add(String(hit._source?.productId));
+    for(const hit of hits){
+     const id=String(hit._source?.productId);
+     if(id&&id!=='undefined'&&!seen.has(id)){ids.push(id);seen.add(id)}
+    }
     total=Number(data.hits?.total?.value||0);
     if(!hits.length)break;
     page++;
    }
-   products=catalog.filter(p=>ids.has(String(p.productId)));
-   $('sourceStatus').textContent='● OPENSEARCH INDEX';
+   const rank=new Map(ids.map((id,i)=>[id,i]));
+   products=catalog.filter(p=>rank.has(String(p.productId)));
+   if(sort==='featured')products.sort((a,b)=>rank.get(String(a.productId))-rank.get(String(b.productId)));
+   if(!products.length&&searchText){
+    products=localCatalogSearch(filterCatalogLocally(catalog,city,range,brand),searchText);
+    $('sourceStatus').textContent=products.length?'● POSTGRESQL CATALOG MATCH':'● NO MATCHES';
+   }else $('sourceStatus').textContent='● OPENSEARCH RESULTS';
   }catch(e){
    if(sequence!==searchRequestSeq)return;
-   notify('Search is temporarily unavailable: '+e.message,true);
-   products=[];$('sourceStatus').textContent='● SEARCH UNAVAILABLE';
+   products=filterCatalogLocally(catalog,city,range,brand);
+   products=searchText?localCatalogSearch(products,searchText):products;
+   $('sourceStatus').textContent='● CATALOG SEARCH · OPENSEARCH UNAVAILABLE';
+   console.warn('OpenSearch unavailable; using current PostgreSQL catalog:',e.message);
   }
  }else $('sourceStatus').textContent='● LIVE POSTGRESQL INVENTORY';
  if(sequence!==searchRequestSeq)return;
@@ -283,6 +353,7 @@ async function applyFilters(){
  if(sort==='name')products.sort((a,b)=>a.name.localeCompare(b.name));
  visible=products;drawProducts();
 }
+
 function setCategory(name){
  category=name;
  document.querySelectorAll('[data-category]').forEach(x=>x.classList.toggle('active',x.dataset.category===name));
@@ -290,20 +361,32 @@ function setCategory(name){
  applyFilters();
 }
 function setupFilters(){
+ const chosenCity=$('cityFilter').value,chosenBrand=$('brandFilter').value;
  const categories=['All',...new Set(catalog.map(p=>p.category))];
  $('categoryChips').innerHTML=categories.map(c=>'<button class="chip '+(c===category?'active':'')+'" data-category="'+escape(c)+'">'+escape(c).toUpperCase()+'</button>').join('');
  document.querySelectorAll('[data-category]').forEach(x=>x.onclick=()=>setCategory(x.dataset.category));
  const brands=[...new Set(catalog.map(p=>p.brand||'NOTHING SELECT'))].sort();
  $('brandFilter').innerHTML='<option value="">All brands</option>'+brands.map(b=>'<option value="'+escape(b)+'">'+escape(b)+'</option>').join('');
- const cities=[...new Set(catalog.map(p=>p.city).filter(Boolean))].sort();
- $('cityFilter').innerHTML='<option value="">All India</option>'+cities.map(c=>'<option value="'+escape(c)+'">'+escape(c)+'</option>').join('');
+ if(brands.includes(chosenBrand))$('brandFilter').value=chosenBrand;
+ // Select from live seller listing cities rather than predefined locations.
+ const cities=new Map();
+ for(const p of catalog){
+  const city=String(p.city||'').trim();
+  if(city&&!cities.has(city.toLocaleLowerCase()))cities.set(city.toLocaleLowerCase(),city);
+ }
+ const options=[...cities.values()].sort((a,b)=>a.localeCompare(b));
+ $('cityFilter').innerHTML='<option value="">All India</option>'+options.map(c=>'<option value="'+escape(c)+'">'+escape(c)+'</option>').join('');
+ const matching=options.find(c=>c.toLocaleLowerCase()===chosenCity.toLocaleLowerCase());
+ if(matching)$('cityFilter').value=matching;
 }
+
 async function loadCatalog(attempt=0){
  try{
   $('sourceStatus').textContent='● CONNECTING TO SPRING BOOT…';
   const data=await request('/api/store/catalog');
   if(!Array.isArray(data))throw new Error('Invalid catalog response');
   catalog=data.filter(p=>p&&p.productId!=null).map(p=>({...p,price:Number(p.price),stock:Number(p.stock)}));
+  refreshPhotoOwners();
   if(!catalog.length){
    // An empty 200 response during Java startup must not look like a valid 0-result search.
    if(attempt<6){
