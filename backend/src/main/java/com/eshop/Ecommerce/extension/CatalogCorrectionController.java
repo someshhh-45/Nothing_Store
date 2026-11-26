@@ -34,12 +34,17 @@ public class CatalogCorrectionController {
    @NotBlank @Size(min=8,max=500) String reason){}
  public record Correction(Long id,Long productId,Long sellerId,String kind,String status,String message,
    String sellerNote,String reviewNote,String requestedBy,OffsetDateTime requestedAt,
-   OffsetDateTime submittedAt,OffsetDateTime reviewedAt){}
+   OffsetDateTime submittedAt,OffsetDateTime reviewedAt,String productName,String description,
+   String brand,String image,String listingStatus,String originalImage,String originalDescription){}
 
- private static Correction view(CatalogCorrectionRequest r){
+ private Correction view(CatalogCorrectionRequest r){
+  Product p=products.findById(r.getProductId()).orElse(null);
   return new Correction(r.getId(),r.getProductId(),r.getSellerId(),r.getKind(),
     r.getStatus(),r.getMessage(),r.getSellerNote(),r.getReviewNote(),r.getRequestedBy(),
-    r.getRequestedAt(),r.getSubmittedAt(),r.getReviewedAt());
+    r.getRequestedAt(),r.getSubmittedAt(),r.getReviewedAt(),
+    p==null?null:p.getProductName(),p==null?null:p.getDescription(),
+    p==null?null:p.getBrand(),p==null?null:p.getImage(),
+    p==null?null:p.getListingStatus(),r.getOriginalImage(),r.getOriginalDescription());
  }
  private static boolean changed(CatalogCorrectionRequest r,Product p){
   if("IMAGE".equals(r.getKind()))
@@ -75,7 +80,7 @@ public class CatalogCorrectionController {
  @Transactional(readOnly=true)
  public List<Correction> sellerRequests(){
   return corrections.findBySellerIdOrderByRequestedAtDesc(auth.loggedInUserId()).stream()
-    .map(CatalogCorrectionController::view).toList();
+    .map(this::view).toList();
  }
  @PostMapping("/api/seller/catalog-corrections/{id}/submit")
  @Transactional
@@ -101,7 +106,7 @@ public class CatalogCorrectionController {
  @Transactional(readOnly=true)
  public List<Correction> all(){
   return corrections.findAllByOrderByRequestedAtDesc().stream()
-    .map(CatalogCorrectionController::view).toList();
+    .map(this::view).toList();
  }
  @PutMapping("/api/admin/catalog-corrections/{id}/review")
  @Transactional
