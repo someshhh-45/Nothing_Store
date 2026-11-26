@@ -334,11 +334,19 @@ async function applyFilters(){
    const rank=new Map(ids.map((id,i)=>[id,i]));
    products=catalog.filter(p=>rank.has(String(p.productId)));
    if(sort==='featured')products.sort((a,b)=>rank.get(String(a.productId))-rank.get(String(b.productId)));
+   // PostgreSQL is authoritative. Include approved items even if the Kafka
+   // indexing event has not reached OpenSearch yet.
+   const candidates=filterCatalogLocally(catalog,city,range,brand);
+   const current=searchText?localCatalogSearch(candidates,searchText):candidates;
+   const matchedIds=new Set(products.map(p=>String(p.productId)));
+   for(const p of current)if(!matchedIds.has(String(p.productId))){
+    products.push(p);matchedIds.add(String(p.productId));
+   }
    if(!products.length){
     const candidates=filterCatalogLocally(catalog,city,range,brand);
     products=searchText?localCatalogSearch(candidates,searchText):candidates;
     $('sourceStatus').textContent=products.length?'● POSTGRESQL CATALOG MATCH':'● NO MATCHES';
-   }else $('sourceStatus').textContent='● OPENSEARCH RESULTS';
+   }else $('sourceStatus').textContent='● OPENSEARCH + LIVE LISTINGS';
   }catch(e){
    if(sequence!==searchRequestSeq)return;
    products=filterCatalogLocally(catalog,city,range,brand);
