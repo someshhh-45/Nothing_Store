@@ -18,11 +18,12 @@ import java.util.*;
 public class CatalogCorrectionController {
  private final ProductRepo products;
  private final CatalogCorrectionRequestRepository corrections;
+ private final CatalogIdentityLinkAuditRepository links;
  private final AuthUtil auth;
  private final DomainEvents events;
  public CatalogCorrectionController(ProductRepo products,CatalogCorrectionRequestRepository corrections,
-   AuthUtil auth,DomainEvents events){
-  this.products=products;this.corrections=corrections;this.auth=auth;this.events=events;
+   CatalogIdentityLinkAuditRepository links,AuthUtil auth,DomainEvents events){
+  this.products=products;this.corrections=corrections;this.links=links;this.auth=auth;this.events=events;
  }
  public record Ask(@NotNull Long productId,@NotBlank @Pattern(regexp="IMAGE|DETAILS") String kind,
    @NotBlank @Size(max=500) String message){}
@@ -161,6 +162,11 @@ public class CatalogCorrectionController {
   source.setCatalogProductId(canonical.getProductId());
   // Keep the source's product ID, owner, submitted image, selling price and stock.
   products.save(source);
+  CatalogIdentityLinkAudit audit=new CatalogIdentityLinkAudit();
+  audit.setProductId(source.getProductId());audit.setCanonicalProductId(canonical.getProductId());
+  audit.setLinkedBy(auth.loggedInUser().getUserName());audit.setReason(body.reason().trim());
+  audit.setLinkedAt(OffsetDateTime.now(ZoneOffset.UTC));
+  links.save(audit);
   events.record("PRODUCT_CHANGED",source.getProductId(),null);
   return Map.of("productId",source.getProductId(),
     "catalogProductId",canonical.getProductId(),"linked",true,
