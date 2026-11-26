@@ -166,7 +166,7 @@ public class OpenSearchCatalog {
   List<Object> filters=new ArrayList<>();
   filters.add(Map.of("term",Map.of("listingStatus","APPROVED")));
   if(category!=null&&!category.isBlank())filters.add(Map.of("term",Map.of("category",category.trim())));
-  if(city!=null&&!city.isBlank())filters.add(Map.of("term",Map.of("city",city.trim())));
+  if(city!=null&&!city.isBlank())filters.add(Map.of("term",Map.of("city",Map.of("value",city.trim(),"case_insensitive",true))));
   Map<String,Object> range=new LinkedHashMap<>();
   if(min!=null)range.put("gte",min);
   if(max!=null)range.put("lte",max);
