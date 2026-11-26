@@ -28,13 +28,13 @@ class SellerFulfillmentIntegrationTest {
  @Autowired OrderItemRepo items;
  @Autowired SellerOrderFulfillmentRepository fulfillments;
 
- private User user(String role){
+ private User makeUser(){
   String id=UUID.randomUUID().toString().substring(0,8);
   return users.save(new User("sf"+id,"sf"+id+"@example.org","test-hash"));
  }
  @Test
  void mixedSellerOrderCannotBeFulfilledByAnotherSeller() throws Exception {
-  User a=user("SELLER"),b=user("SELLER"),other=user("SELLER"),buyer=user("USER");
+  User a=makeUser(),b=makeUser(),other=makeUser(),buyer=makeUser();
   Category category=new Category();category.setCategoryName("Fulfillment "+UUID.randomUUID().toString().substring(0,8));
   category=categories.save(category);
   Product first=new Product();first.setProductName("Seller A Test Item");
