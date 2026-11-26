@@ -1681,6 +1681,23 @@ async function showAdminCorrections(){
    const section=document.createElement('section');section.className='review-card';
    const title=document.createElement('strong');title.textContent='SKU #'+r.productId+' · '+r.kind+' · '+r.status;
    const msg=document.createElement('p');msg.textContent=r.message+(r.sellerNote?' · Seller: '+r.sellerNote:'');section.append(title,msg);
+   const details=document.createElement('p');
+   details.textContent=(r.productName||'Product')+' · '+(r.brand||'')+
+    ' · '+(r.listingStatus||'')+' · '+(r.description||'');
+   section.append(details);
+   if(r.image&&safeProductImage(r.image)){
+    const photo=document.createElement('img');photo.src=r.image;photo.alt='Seller corrected product photograph';
+    photo.loading='lazy';photo.style.cssText='display:block;width:170px;height:140px;object-fit:contain;background:#fff;margin:8px 0';
+    section.append(photo);
+   }
+   if(r.originalDescription&&r.originalDescription!==r.description){
+    const original=document.createElement('p');original.textContent='Previous description: '+r.originalDescription;
+    section.append(original);
+   }
+   if(r.originalImage&&r.originalImage!==r.image){
+    const prior=document.createElement('p');prior.textContent='Previous image: '+r.originalImage;
+    section.append(prior);
+   }
    if(r.status==='SUBMITTED')for(const decision of ['APPROVED','REJECTED']){
     const btn=document.createElement('button');btn.type='button';btn.textContent=decision+' CORRECTION';
     btn.onclick=async()=>{
