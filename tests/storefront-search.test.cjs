@@ -38,7 +38,7 @@ test('unlisted seller cities work with case-insensitive filtering',()=>{
 test('face wash only shows relevant skin cleansers, not earbuds or headphones',()=>{
  const items=[
   {name:'Hydrating Face Wash',description:'Gentle face cleanser',brand:'Nova'},
-  {name:'Bluetooth Earbuds',description:'Case with wash-resistant materials',brand:'Audio'},
+  {name:'Bluetooth Earbuds with Charging Case',description:'Portable audio case, washable materials',brand:'Audio'},
   {name:'Wireless Headphones',description:'Comfortable headset with a carrying case',brand:'Audio'},
   {name:'Face Serum',description:'Lightweight beauty serum',brand:'Beauty'},
   {name:'Body Wash',description:'Daily body cleansing product',brand:'Beauty'}
