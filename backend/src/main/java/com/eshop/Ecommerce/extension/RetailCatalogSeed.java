@@ -73,6 +73,8 @@ public class RetailCatalogSeed {
      .filter(p->name.equalsIgnoreCase(p.getProductName())).findFirst();
   if(existing.isPresent()){
     Product current=existing.get();
+    // Demo seeds may not alter a seller's submitted or approved product.
+    if(current.getUser()!=null)return;
     if(current.getImage()==null||current.getImage().isBlank()){
       current.setImage(imageFor(name));products.save(current);
       events.record("PRODUCT_CHANGED",current.getProductId(),null);
