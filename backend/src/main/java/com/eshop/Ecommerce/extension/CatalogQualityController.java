@@ -55,7 +55,8 @@ public class CatalogQualityController {
   if(p.getCatalogProductId()!=null)return "catalog:"+p.getCatalogProductId();
   if(p.getVariantGroup()!=null&&!p.getVariantGroup().isBlank())
     return "variant:"+norm(p.getVariantGroup())+":"+norm(p.getBrand());
-  return "product:"+p.getProductId();
+  // A canonical row and seller offers linked to it represent one catalog item.
+  return "catalog:"+p.getProductId();
  }
  private static String issueKey(String type,List<Product> rows){
   String data=type+":"+rows.stream().map(p->p.getProductId().toString()).sorted().collect(Collectors.joining(","));
