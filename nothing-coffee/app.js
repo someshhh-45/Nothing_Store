@@ -613,6 +613,7 @@ async function login(mode=null){
   $('adminRequestsBtn').hidden=!(session.roles||[]).includes('ROLE_ADMIN');
   $('adminInventoryBtn').hidden=!(session.roles||[]).includes('ROLE_ADMIN');
   $('adminOffersBtn').hidden=!(session.roles||[]).includes('ROLE_ADMIN');
+   $('adminCatalogQualityBtn').hidden=!(session.roles||[]).includes('ROLE_ADMIN');
   $('sellerInventoryBtn').hidden=!(session.roles||[]).includes('ROLE_SELLER');
   syncSellerNavigation(session);
   await loadRetailerStatus();await applyFilters();await loadServerCart();notify('Welcome, '+user+'! Your cart is synced.');
@@ -634,6 +635,7 @@ async function logout(){
  $('adminRequestsBtn').hidden=true;
  $('adminInventoryBtn').hidden=true;
  $('adminOffersBtn').hidden=true;
+  $('adminCatalogQualityBtn').hidden=true;
  promoQuote=null;promoRequestSeq++;
  $('sellerInventoryBtn').hidden=true;
  syncSellerNavigation(null);
@@ -648,6 +650,7 @@ function syncSellerNavigation(session){
  $('sellerApplyBtn').hidden=seller||admin;
  $('adminSellerAppsBtn').hidden=!admin;
  $('adminSellerListingsBtn').hidden=!admin;
+ $('adminCatalogQualityBtn').hidden=!admin;
 }
 async function applyToSell(){
  if(!user && !await login('LOGIN'))return;
@@ -1634,6 +1637,94 @@ async function showSellerOrders(page=0){
   root.append(actions);d.showModal();
  }catch(e){notify('Seller order history unavailable: '+e.message,true)}
 }
+async function showCatalogQuality(viewStatus='OPEN',viewType='ALL'){
+ try{
+  const report=await request('/api/admin/catalog-quality');
+  const d=$('modal'),root=$('modalContent');if(d.open)d.close();root.replaceChildren();
+  const h=document.createElement('h2');h.textContent='CATALOG QUALITY AUDIT';root.append(h);
+  const intro=document.createElement('p');
+  intro.textContent='Review suspected duplicate SKUs, reused photos and missing seller photos. These decisions never delete or merge inventory or change existing orders.';
+  root.append(intro);
+  const summary=document.createElement('section');summary.className='review-card';
+  const summaryTitle=document.createElement('strong');summaryTitle.textContent=report.totalListings+' PRODUCTS AUDITED';
+  const stats=document.createElement('p');stats.textContent=
+   report.likelyDuplicates+' POSSIBLE DUPLICATES · '+report.reusedImages+' REUSED IMAGES · '+
+   report.missingSellerImages+' MISSING SELLER PHOTOS · '+report.reviewed+' REVIEWED · '+report.dismissed+' DISMISSED';
+  summary.append(summaryTitle,stats);root.append(summary);
+  const controls=document.createElement('div');controls.className='catalog-audit-filters';
+  const status=document.createElement('select');status.setAttribute('aria-label','Review status');
+  for(const v of ['OPEN','REVIEWED','DISMISSED','ALL']){
+   const opt=document.createElement('option');opt.value=v;opt.textContent='STATUS: '+v;status.append(opt);
+  }
+  status.value=viewStatus;
+  const type=document.createElement('select');type.setAttribute('aria-label','Issue type');
+  for(const [v,t] of [['ALL','ALL ISSUE TYPES'],['POSSIBLE_DUPLICATE','DUPLICATES'],
+      ['SHARED_IMAGE','SHARED PHOTOS'],['MISSING_IMAGE','MISSING PHOTOS']]){
+   const opt=document.createElement('option');opt.value=v;opt.textContent=t;type.append(opt);
+  }
+  type.value=viewType;
+  const reload=()=>{d.close();showCatalogQuality(status.value,type.value)};
+  status.onchange=reload;type.onchange=reload;
+  const refresh=document.createElement('button');refresh.type='button';refresh.textContent='REFRESH ↻';
+  refresh.onclick=reload;
+  controls.append(status,type,refresh);root.append(controls);
+  const findings=(report.issues||[]).filter(x=>
+   (status.value==='ALL'||x.reviewStatus===status.value)&&
+   (type.value==='ALL'||x.type===type.value));
+  const count=document.createElement('p');count.textContent=findings.length+' FINDINGS SHOWN';root.append(count);
+  if(!findings.length){
+   const empty=document.createElement('p');empty.textContent='No findings for these filters.';root.append(empty);
+  }
+  for(const finding of findings){
+   const section=document.createElement('section');section.className='review-card catalog-audit-issue';
+   const title=document.createElement('strong');title.textContent=finding.title+' · '+finding.reviewStatus;
+   const desc=document.createElement('p');desc.textContent=finding.explanation;section.append(title,desc);
+   for(const p of finding.listings||[]){
+    const line=document.createElement('div');line.className='catalog-audit-listing';
+    if(p.image&&safeProductImage(p.image)){
+     const img=document.createElement('img');img.src=p.image;img.alt='Current listing photo';img.loading='lazy';line.append(img);
+    }
+    const text=document.createElement('p');text.textContent=
+     'SKU #'+p.productId+' · '+p.name+' · '+(p.brand||'Unbranded')+
+     ' · '+p.category+' · '+(p.sellerId?'Seller #'+p.sellerId:'Store catalog')+
+     ' · '+(p.stock??0)+' units'+(p.catalogProductId?' · Matched catalog #'+p.catalogProductId:'');
+    line.append(text);section.append(line);
+   }
+   if(finding.reviewNote){
+    const note=document.createElement('p');
+    note.textContent='ADMIN NOTE · '+(finding.reviewedBy||'')+' · '+finding.reviewNote;
+    section.append(note);
+   }
+   const buttons=document.createElement('div');buttons.className='actions';
+   for(const [next,label] of [['REVIEWED','MARK REVIEWED'],['DISMISSED','DISMISS'],['OPEN','REOPEN']]){
+    if(next===finding.reviewStatus)continue;
+    const btn=document.createElement('button');btn.type='button';btn.textContent=label;
+    btn.onclick=async()=>{
+     d.close();
+     let note=null;
+     if(next!=='OPEN'){
+      const answer=await showDialog('CATALOG QUALITY · '+label,[
+       {name:'note',label:'ADMIN NOTE (OPTIONAL)',required:false,placeholder:'Explain the decision'}
+      ],'SAVE REVIEW');
+      if(!answer){showCatalogQuality(viewStatus,viewType);return}
+      note=answer.note;
+     }
+     try{
+      await request('/api/admin/catalog-quality/'+encodeURIComponent(finding.key)+'/review',{
+       method:'PUT',body:JSON.stringify({status:next,note})
+      });
+      notify('Review saved; product and order data unchanged.');
+     }catch(e){notify('Review failed: '+e.message,true)}
+     showCatalogQuality(status.value,type.value);
+    };
+    buttons.append(btn);
+   }
+   section.append(buttons);root.append(section);
+  }
+  const close=document.createElement('button');close.type='button';close.textContent='CLOSE';
+  close.onclick=()=>d.close();root.append(close);d.showModal();
+ }catch(e){notify('Catalog quality unavailable: '+e.message,true)}
+}
 async function showInventoryPanel(seller){
  try{
   const group=seller?'seller':'admin';
@@ -1886,6 +1977,7 @@ function bind(){
  $('adminRequestsBtn').onclick=reviewAfterSaleRequests;
  $('adminInventoryBtn').onclick=()=>showInventoryPanel(false);
  $('adminOffersBtn').onclick=showOfferAdmin;
+  $('adminCatalogQualityBtn').onclick=()=>showCatalogQuality();
  $('applyCouponBtn').onclick=()=>applyCouponCode($('couponInput').value);
  $('removeCouponBtn').onclick=removeCouponCode;
  $('couponInput').onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();applyCouponCode($('couponInput').value)}};
