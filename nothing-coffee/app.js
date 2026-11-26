@@ -334,8 +334,9 @@ async function applyFilters(){
    const rank=new Map(ids.map((id,i)=>[id,i]));
    products=catalog.filter(p=>rank.has(String(p.productId)));
    if(sort==='featured')products.sort((a,b)=>rank.get(String(a.productId))-rank.get(String(b.productId)));
-   if(!products.length&&searchText){
-    products=localCatalogSearch(filterCatalogLocally(catalog,city,range,brand),searchText);
+   if(!products.length){
+    const candidates=filterCatalogLocally(catalog,city,range,brand);
+    products=searchText?localCatalogSearch(candidates,searchText):candidates;
     $('sourceStatus').textContent=products.length?'● POSTGRESQL CATALOG MATCH':'● NO MATCHES';
    }else $('sourceStatus').textContent='● OPENSEARCH RESULTS';
   }catch(e){
@@ -1727,9 +1728,41 @@ function offerText(o){
  return o.kind==='PERCENT'?Number(o.value)+'% OFF'+(o.maxDiscount?' · UP TO '+money(o.maxDiscount):'')+' · '+range:
    money(o.value)+' OFF · '+range;
 }
+function renderOfferTicker(){
+ const banner=$('offerTicker');
+ banner.hidden=!offerList.length;
+ if(!offerList.length)return;
+ offerTickerIndex=((offerTickerIndex%offerList.length)+offerList.length)%offerList.length;
+ const offer=offerList[offerTickerIndex];
+ $('offerTickerTitle').textContent=offer.title;
+ $('offerTickerCode').textContent=offer.autoApply?'AUTO-APPLIED':'CODE '+offer.code;
+ $('offerTickerDetails').textContent=offerText(offer);
+ $('offerTickerCounter').textContent=(offerTickerIndex+1)+' / '+offerList.length;
+ $('offerTickerUse').textContent=offer.autoApply?'SHOP THE DEAL ↗':'USE '+offer.code+' ↗';
+ $('offerTickerUse').onclick=()=>{
+  if(offer.autoApply){$('catalog').scrollIntoView({behavior:'smooth'});return}
+  $('couponInput').value=offer.code;
+  openCart();
+  notify('Coupon '+offer.code+' selected. Add eligible products and apply it in your bag.');
+ };
+}
+function advanceOfferTicker(delta=1){
+ if(!offerList.length)return;
+ offerTickerIndex=(offerTickerIndex+delta+offerList.length)%offerList.length;
+ renderOfferTicker();
+}
+function stopOfferTicker(){
+ if(offerTickerTimer){clearInterval(offerTickerTimer);offerTickerTimer=null}
+}
+function startOfferTicker(){
+ stopOfferTicker();
+ if(offerList.length<2||window.matchMedia('(prefers-reduced-motion: reduce)').matches)return;
+ offerTickerTimer=setInterval(()=>advanceOfferTicker(),5500);
+}
 async function loadOffers(){
  const response=await request('/api/store/offers');
  offerList=Array.isArray(response)?response:[];
+ offerTickerIndex=0;renderOfferTicker();startOfferTicker();
  const root=$('offersGrid');root.replaceChildren();
  if(!offerList.length){root.textContent='More offers are coming soon. Check back for limited-time promotions.';return}
  for(const offer of offerList){
@@ -1803,6 +1836,14 @@ async function showOfferAdmin(){
 
 function bind(){
  $('year').textContent=new Date().getFullYear();
+ $('offerTickerPrev').onclick=()=>{advanceOfferTicker(-1);startOfferTicker()};
+ $('offerTickerNext').onclick=()=>{advanceOfferTicker(1);startOfferTicker()};
+ $('offerTicker').addEventListener('mouseenter',stopOfferTicker);
+ $('offerTicker').addEventListener('mouseleave',startOfferTicker);
+ $('offerTicker').addEventListener('focusin',stopOfferTicker);
+ $('offerTicker').addEventListener('focusout',e=>{
+  if(!$('offerTicker').contains(e.relatedTarget))startOfferTicker();
+ });
  $('cartBtn').onclick=openCart;$('closeCart').onclick=closeCart;$('overlay').onclick=closeCart;
  $('accountBtn').onclick=accountAction;
  $('signInBtn').onclick=()=>login('LOGIN');
