@@ -179,9 +179,11 @@ public class OpenSearchCatalog {
    // Exact/full-word, typo-tolerant, prefix and anywhere-in-word matches.
    // "buds" -> "earbuds"; "bluetoth" -> "bluetooth".
    List<Object> should=new ArrayList<>();
+   // Every search word must match. A broad OR query used to bring back
+   // unrelated earbuds when searching for "face wash".
    should.add(Map.of("multi_match",Map.of("query",query,
        "fields",List.of("productName^7","description^2"),
-       "fuzziness","AUTO","type","best_fields")));
+       "operator","and","fuzziness","AUTO","type","best_fields")));
    should.add(Map.of("match",Map.of("searchText",Map.of("query",query,
        "operator","and","boost",3))));
    // Require every search word to match, but allow spelling mistakes independently.
@@ -191,7 +193,7 @@ public class OpenSearchCatalog {
        "query",query,"operator","and","fuzziness",2,
        "prefix_length",0,"max_expansions",100,"boost",9))));
    should.add(Map.of("match",Map.of("description",Map.of(
-       "query",query,"operator","and","fuzziness",2,"boost",2))));
+       "query",query,"operator","and","boost",1))));
    should.add(Map.of("match_phrase_prefix",Map.of("productName",Map.of("query",query,"boost",4))));
    // Speech-to-text and casual typing frequently split one product term:
    // "blue teuth" -> "blueteuth", which is two edits from "bluetooth".
