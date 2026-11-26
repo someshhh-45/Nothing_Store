@@ -40,27 +40,44 @@ function wordEditDistance(a,b){
  }
  return prev[b.length];
 }
-function localCatalogSearch(items,q){
- const tokens=searchTokens(q);
- if(!tokens.length)return items;
- return items.map(p=>{
-  const words=searchTokens([p.name,p.brand,p.description].join(' '));
-  let score=0;
-  for(const t of tokens){
-   let best=Infinity;
-   for(const w of words){
-    if(w===t){best=0;break}
-    if(w.startsWith(t)||t.startsWith(w)){best=Math.min(best,1);continue}
-    if(Math.abs(w.length-t.length)>2)continue;
-    const edits=wordEditDistance(t,w);
-    if(edits<=2)best=Math.min(best,edits+1);
-   }
-   if(!Number.isFinite(best))return {p,score:Infinity};
-   score+=best;
+// Relevance gate used for BOTH OpenSearch hits and the live catalog fallback.
+// Fuzzy spelling belongs on the product name/brand, not the description:
+// matching "fase" with "case" and "wuh" with "with" would show earbuds for face wash.
+function productSearchScore(p,query){
+ const tokens=searchTokens(query);
+ if(!tokens.length)return 0;
+ const titleWords=searchTokens([p.variantGroup||p.name,p.brand].join(' '));
+ const descriptionWords=new Set(searchTokens(p.description));
+ const normalizedTitle=titleWords.join(' ');
+ let titleScore=0,descriptionMatches=0;
+ for(const token of tokens){
+  let best=Infinity;
+  for(const word of titleWords){
+   if(word===token){best=0;break}
+   if(token.length>=3&&(word.includes(token)||token.includes(word))){best=Math.min(best,1);continue}
+   if(token.length<3||Math.abs(word.length-token.length)>2)continue;
+   const maxEdits=token.length<=3?0:token.length<=5?2:2;
+   const edits=wordEditDistance(token,word);
+   if(edits<=maxEdits)best=Math.min(best,2+edits);
   }
-  return {p,score};
- }).filter(x=>Number.isFinite(x.score)).sort((a,b)=>a.score-b.score).map(x=>x.p);
+  if(Number.isFinite(best))titleScore+=best;
+  else if(descriptionWords.has(token))descriptionMatches++;
+  else return Infinity;
+ }
+ // Description-only discovery requires ALL query words to match exactly;
+ // fuzzy description matches are too broad for commerce search.
+ if(descriptionMatches===tokens.length)return 15+tokens.length;
+ if(descriptionMatches>0)return 8+titleScore+descriptionMatches;
+ if(normalizedTitle.includes(tokens.join(' ')))return 0;
+ return titleScore;
 }
+function localCatalogSearch(items,q){
+ if(!searchTokens(q).length)return items;
+ return items.map(p=>({p,score:productSearchScore(p,q)}))
+  .filter(x=>Number.isFinite(x.score))
+  .sort((a,b)=>a.score-b.score).map(x=>x.p);
+}
+
 function filterCatalogLocally(items,city,range,brand){
  const [low,high]=range?range.split('-').map(Number):[null,null];
  return items.filter(p=>(category==='All'||p.category===category) &&
@@ -332,19 +349,23 @@ async function applyFilters(){
     page++;
    }
    const rank=new Map(ids.map((id,i)=>[id,i]));
-   products=catalog.filter(p=>rank.has(String(p.productId)));
-   if(sort==='featured')products.sort((a,b)=>rank.get(String(a.productId))-rank.get(String(b.productId)));
-   // PostgreSQL is authoritative. Include approved items even if the Kafka
-   // indexing event has not reached OpenSearch yet.
    const candidates=filterCatalogLocally(catalog,city,range,brand);
-   const current=searchText?localCatalogSearch(candidates,searchText):candidates;
-   const matchedIds=new Set(products.map(p=>String(p.productId)));
-   for(const p of current)if(!matchedIds.has(String(p.productId))){
-    products.push(p);matchedIds.add(String(p.productId));
+   // OpenSearch is a retrieval engine, not a license to display unrelated hits.
+   // Apply the same strict relevance gate to indexed and non-indexed products.
+   const matching=searchText?localCatalogSearch(candidates,searchText):candidates;
+   if(searchText){
+    const score=p=>productSearchScore(p,searchText);
+    products=matching.sort((a,b)=>score(a)-score(b)||
+     (rank.get(String(a.productId))??Infinity)-(rank.get(String(b.productId))??Infinity));
+   }else{
+    const ordered=candidates.filter(p=>rank.has(String(p.productId)))
+     .sort((a,b)=>rank.get(String(a.productId))-rank.get(String(b.productId)));
+    const seen=new Set(ordered.map(p=>String(p.productId)));
+    products=[...ordered,...candidates.filter(p=>!seen.has(String(p.productId)))];
    }
+
    if(!products.length){
-    const candidates=filterCatalogLocally(catalog,city,range,brand);
-    products=searchText?localCatalogSearch(candidates,searchText):candidates;
+    products=[];
     $('sourceStatus').textContent=products.length?'● POSTGRESQL CATALOG MATCH':'● NO MATCHES';
    }else $('sourceStatus').textContent='● OPENSEARCH + LIVE LISTINGS';
   }catch(e){
