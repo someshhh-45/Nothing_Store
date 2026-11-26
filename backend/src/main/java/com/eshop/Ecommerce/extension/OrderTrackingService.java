@@ -116,7 +116,15 @@ public class OrderTrackingService {
         if(request==null)throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Tracking update is required");
         Order order=orders.findByIdForTrackingUpdate(id)
             .orElseThrow(()->new ResponseStatusException(HttpStatus.NOT_FOUND,"Order not found"));
-        if(seller)requireSellerOwner(order);
+        if(seller){
+            requireSellerOwner(order);
+            long distinctSellers=order.getOrderItems().stream()
+                .map(item->item.getProduct()==null?null:item.getProduct().getUser())
+                .filter(Objects::nonNull).map(User::getUserid).distinct().count();
+            if(distinctSellers>1)
+                throw new ResponseStatusException(HttpStatus.CONFLICT,
+                    "Multi-seller orders require seller-specific fulfillment updates");
+        }
         List<OrderTrackingEvent> rows=events.findByOrderOrderIdOrderByOccurredAtAscIdAsc(id);
         OrderTrackingStage current=rows.isEmpty() ?
             OrderTrackingStage.parse(order.getOrderStatus()) : rows.get(rows.size()-1).getStage();
