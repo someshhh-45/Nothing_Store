@@ -35,6 +35,24 @@ test('unlisted seller cities work with case-insensitive filtering',()=>{
  assert.equal(matches[0].name,'Demo Product');
 });
 
+test('face wash only shows relevant skin cleansers, not earbuds or headphones',()=>{
+ const items=[
+  {name:'Hydrating Face Wash',description:'Gentle face cleanser',brand:'Nova'},
+  {name:'Bluetooth Earbuds',description:'Case with wash-resistant materials',brand:'Audio'},
+  {name:'Wireless Headphones',description:'Comfortable headset with a carrying case',brand:'Audio'},
+  {name:'Face Serum',description:'Lightweight beauty serum',brand:'Beauty'},
+  {name:'Body Wash',description:'Daily body cleansing product',brand:'Beauty'}
+ ];
+ assert.deepEqual(context.localCatalogSearch(items,'face wash').map(x=>x.name),['Hydrating Face Wash']);
+ assert.deepEqual(context.localCatalogSearch(items,'fase wuh').map(x=>x.name),['Hydrating Face Wash']);
+});
+test('exact description matching is supported without fuzzy matching description noise',()=>{
+ const items=[
+  {name:'Portable Cleanser',description:'A gentle face wash for daily use',brand:'Beauty'},
+  {name:'Wireless Earbuds',description:'Case with waterproof materials',brand:'Audio'}
+ ];
+ assert.deepEqual(context.localCatalogSearch(items,'face wash').map(x=>x.name),['Portable Cleanser']);
+});
 test('invalid search words do not return every product',()=>{
  const items=[{name:'Hydrating Face Wash',description:'Gentle cleanser',brand:'Nova'}];
  assert.equal(context.localCatalogSearch(items,'unrelatedxyz').length,0);
