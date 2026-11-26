@@ -1637,6 +1637,89 @@ async function showSellerOrders(page=0){
   root.append(actions);d.showModal();
  }catch(e){notify('Seller order history unavailable: '+e.message,true)}
 }
+async function showSellerCorrections(){
+ try{
+  const rows=await request('/api/seller/catalog-corrections');
+  const d=$('modal'),root=$('modalContent');if(d.open)d.close();root.replaceChildren();
+  const h=document.createElement('h2');h.textContent='SELLER CORRECTION REQUESTS';root.append(h);
+  const p=document.createElement('p');p.textContent='Use Seller Dashboard → Edit Listing or Upload Photo before submitting the requested correction.';root.append(p);
+  if(!rows.length){const empty=document.createElement('p');empty.textContent='No correction requests.';root.append(empty)}
+  for(const r of rows){
+   const section=document.createElement('section');section.className='review-card';
+   const title=document.createElement('strong');title.textContent='SKU #'+r.productId+' · '+r.kind+' · '+r.status;
+   const msg=document.createElement('p');msg.textContent=r.message;section.append(title,msg);
+   if(r.reviewNote){const note=document.createElement('p');note.textContent='Admin: '+r.reviewNote;section.append(note)}
+   if(r.status==='REQUESTED'){
+    const btn=document.createElement('button');btn.type='button';btn.textContent='SUBMIT COMPLETED CORRECTION';
+    btn.onclick=async()=>{
+     d.close();const data=await showDialog('SUBMIT CORRECTION',[
+      {name:'note',label:'WHAT DID YOU CHANGE? (OPTIONAL)',required:false,placeholder:'Uploaded a new product photo'}
+     ],'SEND FOR APPROVAL');
+     if(!data){showSellerCorrections();return}
+     try{
+      await request('/api/seller/catalog-corrections/'+r.id+'/submit',{
+       method:'POST',body:JSON.stringify({note:data.note||null})});
+      notify('Submitted for admin review.');
+     }catch(e){notify('Correction submission failed: '+e.message,true)}
+     showSellerCorrections();
+    };section.append(btn);
+   }
+   root.append(section);
+  }
+  const back=document.createElement('button');back.type='button';back.textContent='BACK TO INVENTORY';back.onclick=()=>{d.close();showInventoryPanel(true)};root.append(back);
+  d.showModal();
+ }catch(e){notify('Correction requests unavailable: '+e.message,true)}
+}
+async function showAdminCorrections(){
+ try{
+  const rows=await request('/api/admin/catalog-corrections');
+  const d=$('modal'),root=$('modalContent');if(d.open)d.close();root.replaceChildren();
+  const h=document.createElement('h2');h.textContent='SELLER CORRECTIONS';root.append(h);
+  const active=rows.filter(r=>r.status==='REQUESTED'||r.status==='SUBMITTED');
+  if(!active.length){const empty=document.createElement('p');empty.textContent='No active correction requests.';root.append(empty)}
+  for(const r of active){
+   const section=document.createElement('section');section.className='review-card';
+   const title=document.createElement('strong');title.textContent='SKU #'+r.productId+' · '+r.kind+' · '+r.status;
+   const msg=document.createElement('p');msg.textContent=r.message+(r.sellerNote?' · Seller: '+r.sellerNote:'');section.append(title,msg);
+   if(r.status==='SUBMITTED')for(const decision of ['APPROVED','REJECTED']){
+    const btn=document.createElement('button');btn.type='button';btn.textContent=decision+' CORRECTION';
+    btn.onclick=async()=>{
+     d.close();const data=await showDialog('REVIEW SELLER CORRECTION',[
+      {name:'note',label:'REVIEW NOTES (OPTIONAL)',required:false,placeholder:'Review explanation'}
+     ],'SAVE DECISION');
+     if(!data){showAdminCorrections();return}
+     try{
+      await request('/api/admin/catalog-corrections/'+r.id+'/review',{
+       method:'PUT',body:JSON.stringify({decision,note:data.note||null})});
+      notify('Correction '+decision.toLowerCase()+'.');
+     }catch(e){notify('Review failed: '+e.message,true)}
+     showAdminCorrections();
+    };section.append(btn);
+   }
+   root.append(section);
+  }
+  const back=document.createElement('button');back.type='button';back.textContent='BACK TO CATALOG QUALITY';
+  back.onclick=()=>{d.close();showCatalogQuality()};root.append(back);d.showModal();
+ }catch(e){notify('Admin correction review unavailable: '+e.message,true)}
+}
+async function linkCatalogDuplicate(source,target){
+ const input=await showDialog('LINK CONFIRMED DUPLICATE',[
+  {name:'productId',label:'SELLER LISTING ID',type:'number',value:String(source)},
+  {name:'canonicalProductId',label:'CANONICAL PRODUCT ID',type:'number',value:String(target)},
+  {name:'reason',label:'WHY IS THIS THE SAME PRODUCT?',placeholder:'Same model, brand and product specifications',minLength:8}
+ ],'LINK PRODUCTS');
+ if(!input)return;
+ if(!Number.isSafeInteger(Number(input.productId))||!Number.isSafeInteger(Number(input.canonicalProductId))||
+    Number(input.productId)===Number(input.canonicalProductId)){notify('Choose two different valid product IDs.',true);return}
+ try{
+  await request('/api/admin/catalog-quality/link',{method:'POST',body:JSON.stringify({
+   productId:Number(input.productId),canonicalProductId:Number(input.canonicalProductId),reason:input.reason
+  })});
+  notify('Catalog products linked. Inventory, sellers and order IDs were preserved.');
+  await loadCatalog();
+ }catch(e){notify('Cannot link products: '+e.message,true)}
+ showCatalogQuality();
+}
 async function showCatalogQuality(viewStatus='OPEN',viewType='ALL'){
  try{
   const report=await request('/api/admin/catalog-quality');
@@ -1651,6 +1734,9 @@ async function showCatalogQuality(viewStatus='OPEN',viewType='ALL'){
    report.likelyDuplicates+' POSSIBLE DUPLICATES · '+report.reusedImages+' REUSED IMAGES · '+
    report.missingSellerImages+' MISSING SELLER PHOTOS · '+report.reviewed+' REVIEWED · '+report.dismissed+' DISMISSED';
   summary.append(summaryTitle,stats);root.append(summary);
+  const reviewCorrections=document.createElement('button');reviewCorrections.type='button';
+  reviewCorrections.textContent='REVIEW SELLER CORRECTIONS ↗';
+  reviewCorrections.onclick=()=>{d.close();showAdminCorrections()};root.append(reviewCorrections);
   const controls=document.createElement('div');controls.className='catalog-audit-filters';
   const status=document.createElement('select');status.setAttribute('aria-label','Review status');
   for(const v of ['OPEN','REVIEWED','DISMISSED','ALL']){
@@ -1719,6 +1805,29 @@ async function showCatalogQuality(viewStatus='OPEN',viewType='ALL'){
     };
     buttons.append(btn);
    }
+   for(const p of finding.listings||[]){
+    if(!p.sellerId)continue;
+    const fix=document.createElement('button');fix.type='button';fix.textContent='REQUEST CORRECTION · SKU #'+p.productId;
+    fix.onclick=async()=>{
+     d.close();
+     const input=await showDialog('REQUEST SELLER CORRECTION',[
+      {name:'kind',label:'IMAGE OR DETAILS',value:finding.type==='POSSIBLE_DUPLICATE'?'DETAILS':'IMAGE'},
+      {name:'message',label:'WHAT SHOULD THE SELLER CHANGE?',placeholder:'Please submit an accurate photo',minLength:8}
+     ],'SEND REQUEST');
+     if(!input){showCatalogQuality(viewStatus,viewType);return}
+     try{
+      await request('/api/admin/catalog-corrections',{method:'POST',
+       body:JSON.stringify({productId:p.productId,kind:input.kind.toUpperCase(),message:input.message})});
+      notify('Correction request sent.');
+     }catch(e){notify('Correction request failed: '+e.message,true)}
+     showCatalogQuality(viewStatus,viewType);
+    };buttons.append(fix);
+   }
+   if(finding.type==='POSSIBLE_DUPLICATE'&&finding.listings.length>1){
+    const link=document.createElement('button');link.type='button';link.textContent='LINK CONFIRMED DUPLICATE ↗';
+    link.onclick=()=>{d.close();linkCatalogDuplicate(finding.listings[1].productId,finding.listings[0].productId)};
+    buttons.append(link);
+   }
    section.append(buttons);root.append(section);
   }
   const close=document.createElement('button');close.type='button';close.textContent='CLOSE';
@@ -1759,7 +1868,10 @@ async function showInventoryPanel(seller){
      (profile.contactPhone?' · Contact: '+profile.contactPhone:'')+
      (profile.reviewNote?' · Review note: '+profile.reviewNote:''));
    };
-   buttons.append(orders,store);root.append(buttons);
+   const corrections=document.createElement('button');corrections.type='button';
+   corrections.textContent='CATALOG CORRECTION REQUESTS';
+   corrections.onclick=()=>{d.close();showSellerCorrections()};
+   buttons.append(orders,store,corrections);root.append(buttons);
   }
   const create=document.createElement('button');create.type='button';create.className='primary-choice';
   create.textContent='+ ADD PRODUCT TO CATALOG';create.onclick=()=>{d.close();createInventoryListing(seller)};
