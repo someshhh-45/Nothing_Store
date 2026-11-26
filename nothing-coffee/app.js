@@ -841,7 +841,10 @@ async function showOrders(){
      notify(message);
     }catch(e){notify('Could not check email status: '+e.message,true)}
    };
-   row.append(reschedule,returned,emailButton);root.append(row);
+   const sellerShipping=document.createElement('button');sellerShipping.type='button';
+    sellerShipping.className='track-order-button';sellerShipping.textContent='SELLER SHIPPING DETAILS ↗';
+    sellerShipping.onclick=()=>{d.close();customerSellerFulfillments(o.orderId)};
+    row.append(reschedule,returned,emailButton,sellerShipping);root.append(row);
   }
   const close=document.createElement('button');close.className='outline-button';close.textContent='CLOSE';close.onclick=()=>d.close();
   root.append(close);d.showModal();
@@ -1410,6 +1413,76 @@ async function editSellerProduct(product){
   await loadCatalog();await showInventoryPanel(true);
  }catch(e){notify('Product edit failed: '+e.message,true)}
 }
+async function manageSellerFulfillment(orderId,page=0){
+ try{
+  const state=await request('/api/seller/orders/'+encodeURIComponent(orderId)+'/fulfillment');
+  const d=$('modal'),root=$('modalContent');if(d.open)d.close();root.replaceChildren();
+  const title=document.createElement('h2');title.textContent='FULFILL ORDER #'+orderId;root.append(title);
+  const current=document.createElement('p');current.textContent='YOUR SHIPMENT · '+trackingLabel(state.stage);root.append(current);
+  if(state.carrier&&state.trackingNumber){
+   const shipped=document.createElement('p');
+   shipped.textContent='Courier: '+state.carrier+' · Reference: '+state.trackingNumber;
+   root.append(shipped);
+  }
+  const info=document.createElement('p');info.textContent='Only the products sold by your account are updated. Other sellers manage their own shipments.';root.append(info);
+  const next=(stageOptions[state.stage]||[]).filter(stage=>stage!=='CANCELLED');
+  for(const stage of next){
+   const btn=document.createElement('button');btn.type='button';btn.className='primary-choice';
+   btn.textContent='MARK '+trackingLabel(stage)+' ↗';
+   btn.onclick=async()=>{
+    d.close();
+    const fields=stage==='SHIPPED'?[
+      {name:'carrier',label:'COURIER NAME',placeholder:'Example Courier',minLength:2},
+      {name:'trackingNumber',label:'TRACKING REFERENCE',placeholder:'SHIP12345',minLength:5},
+      {name:'note',label:'FULFILLMENT NOTE (OPTIONAL)',required:false,placeholder:'Handed to courier'}
+    ]:[{name:'note',label:'FULFILLMENT NOTE (OPTIONAL)',required:false,placeholder:'Update for customer'}];
+    const data=await showDialog('CONFIRM '+trackingLabel(stage),fields,'SAVE FULFILLMENT');
+    if(!data)return manageSellerFulfillment(orderId,page);
+    try{
+     await request('/api/seller/orders/'+encodeURIComponent(orderId)+'/fulfillment',{
+      method:'PUT',body:JSON.stringify({stage,note:data.note||null,
+       carrier:stage==='SHIPPED'?data.carrier:null,
+       trackingNumber:stage==='SHIPPED'?data.trackingNumber:null})
+     });
+     notify('Your seller shipment is now '+trackingLabel(stage)+'.');
+     await showSellerOrders(page);
+    }catch(e){notify('Fulfillment update failed: '+e.message,true)}
+   };
+   root.append(btn);
+  }
+  if(!next.length){
+   const complete=document.createElement('p');complete.textContent='No further fulfillment update is available.';root.append(complete);
+  }
+  const back=document.createElement('button');back.type='button';back.className='outline-button';
+  back.textContent='BACK TO SELLER ORDERS';back.onclick=()=>{d.close();showSellerOrders(page)};root.append(back);
+  d.showModal();
+ }catch(e){notify('Seller fulfillment unavailable: '+e.message,true)}
+}
+async function customerSellerFulfillments(orderId){
+ try{
+  const rows=await request('/api/customer/orders/'+encodeURIComponent(orderId)+'/seller-fulfillments');
+  const d=$('modal'),root=$('modalContent');if(d.open)d.close();root.replaceChildren();
+  const title=document.createElement('h2');title.textContent='SELLER SHIPPING · ORDER #'+orderId;root.append(title);
+  const disclaimer=document.createElement('p');
+  disclaimer.textContent='Seller-entered shipping updates. Courier GPS and automatic delivery scans are not connected.';
+  root.append(disclaimer);
+  if(!rows.length){const empty=document.createElement('p');empty.textContent='No independent seller shipments are recorded for this order.';root.append(empty)}
+  for(const row of rows){
+   const item=document.createElement('section');item.className='review-card';
+   const seller=document.createElement('strong');seller.textContent='SOLD BY · '+(row.sellerName||'Independent seller');
+   const stage=document.createElement('p');stage.textContent='Status: '+trackingLabel(row.stage);
+   item.append(seller,stage);
+   if(row.carrier&&row.trackingNumber){
+    const ship=document.createElement('p');ship.textContent='Courier: '+row.carrier+' · Reference: '+row.trackingNumber;item.append(ship);
+   }
+   if(row.updatedAt){const date=document.createElement('p');date.textContent='Updated: '+formatEventTime(row.updatedAt);item.append(date)}
+   if(row.note){const note=document.createElement('p');note.textContent=row.note;item.append(note)}
+   root.append(item);
+  }
+  const close=document.createElement('button');close.type='button';close.className='outline-button';close.textContent='CLOSE';close.onclick=()=>d.close();root.append(close);
+  d.showModal();
+ }catch(e){notify('Seller shipping details unavailable: '+e.message,true)}
+}
 async function showSellerOrders(page=0){
  try{
   const items=await request('/api/seller/dashboard/orders?page='+encodeURIComponent(page));
@@ -1426,7 +1499,11 @@ async function showSellerOrders(page=0){
    const detail=document.createElement('p');
    detail.textContent=(item.orderDate||'')+' · '+(item.orderStatus||'PLACED')+
     ' · '+item.quantity+' units · '+money(item.lineTotal);
-   section.append(heading,detail);root.append(section);
+   section.append(heading,detail);
+   const fulfill=document.createElement('button');fulfill.type='button';fulfill.className='outline-button';
+   fulfill.textContent='MANAGE YOUR SHIPMENT ↗';
+   fulfill.onclick=()=>{d.close();manageSellerFulfillment(item.orderId,page)};
+   section.append(fulfill);root.append(section);
   }
   const actions=document.createElement('div');actions.className='actions';
   if(page>0){
