@@ -56,6 +56,15 @@ class OpenSearchQueryTest {
   assertNull(OpenSearchCatalog.compactMisspellingCandidate("laptop gaming keyboard headphones"));
  }
 
+ @Test
+ void multipleMisspelledWordsUseAndFuzzyMatchesAndCaseInsensitiveSellerCity(){
+  String json=toJson(OpenSearchCatalog.searchRequest("fase wuh",null,null,null,"Unlisted Seller City",0,100));
+  assertTrue(json.contains("\\"fuzziness\\":2"),json);
+  assertTrue(json.contains("\\"operator\\":\\"and\\""),json);
+  assertTrue(json.contains("\\"case_insensitive\\":true"),json);
+  assertTrue(json.contains("Unlisted Seller City"),json);
+  assertTrue(json.contains("fase wuh"),json);
+ }
  private String toJson(Object value){
   try{return mapper.writeValueAsString(value);}
   catch(Exception ex){throw new AssertionError(ex);}
