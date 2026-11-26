@@ -39,6 +39,7 @@ class MultiSellerCheckoutIntegrationTest {
   second.setCatalogProductId(canonical.getProductId());second.setUser(sellerB);
   second.setQuantity(10);second.setPrice(1399);second.setSpecialPrice(1399);
   second.setListingStatus("APPROVED");second=products.saveAndFlush(second);
+  final Long selectedProductId=second.getProductId();
   Address address=new Address("Test Road","Building B","Bengaluru","Karnataka","India","560001");
   address.setUser(buyer);address=addresses.save(address);
   Cart cart=new Cart();cart.setUser(buyer);cart.setTotalPrice(2798.0);cart=carts.save(cart);
@@ -52,7 +53,7 @@ class MultiSellerCheckoutIntegrationTest {
   var sellerBItems=orderItems.findSellerOrderLines(sellerB.getUserid(),PageRequest.of(0,20));
   assertTrue(sellerBItems.stream().anyMatch(line->
       placed.getOrderId().equals(line.getOrder().getOrderId()) &&
-      second.getProductId().equals(line.getProduct().getProductId()) &&
+      selectedProductId.equals(line.getProduct().getProductId()) &&
       line.getQuantity()==2 && Math.abs(line.getOrderedProductPrice()-1399.0)<0.001));
   var sellerAItems=orderItems.findSellerOrderLines(sellerA.getUserid(),PageRequest.of(0,20));
   assertFalse(sellerAItems.stream().anyMatch(line->
