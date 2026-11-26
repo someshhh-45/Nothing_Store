@@ -60,6 +60,7 @@ jobs:
         run: |
           node --check nothing-coffee/app.js
           node --check nothing-coffee/backend.js
+          node --test tests/storefront-search.test.cjs
       - name: Validate marketplace frontend integration
         run: |
           python3 - <<'PY'
