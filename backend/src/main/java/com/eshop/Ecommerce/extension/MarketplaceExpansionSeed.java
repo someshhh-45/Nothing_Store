@@ -75,6 +75,8 @@ public class MarketplaceExpansionSeed {
         for (Entry entry : readEntries()) {
             Product existing = byName.get(entry.name().toLowerCase(Locale.ROOT));
             if (existing != null) {
+                // Never add demo photography or other fields to seller-controlled inventory.
+                if (existing.getUser() != null) continue;
                 boolean changed = false;
                 if (existing.getBrand() == null || existing.getBrand().isBlank()) {
                     existing.setBrand(entry.brand());
