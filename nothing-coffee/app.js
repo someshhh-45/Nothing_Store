@@ -1754,6 +1754,10 @@ async function showCatalogQuality(viewStatus='OPEN',viewType='ALL'){
   const reviewCorrections=document.createElement('button');reviewCorrections.type='button';
   reviewCorrections.textContent='REVIEW SELLER CORRECTIONS ↗';
   reviewCorrections.onclick=()=>{d.close();showAdminCorrections()};root.append(reviewCorrections);
+  const platformZones=document.createElement('button');platformZones.type='button';
+  platformZones.textContent='PLATFORM DELIVERY ZONES';
+  platformZones.onclick=()=>{d.close();showDeliveryZones(false)};
+  root.append(platformZones);
   const controls=document.createElement('div');controls.className='catalog-audit-filters';
   const status=document.createElement('select');status.setAttribute('aria-label','Review status');
   for(const v of ['OPEN','REVIEWED','DISMISSED','ALL']){
@@ -1851,6 +1855,52 @@ async function showCatalogQuality(viewStatus='OPEN',viewType='ALL'){
   close.onclick=()=>d.close();root.append(close);d.showModal();
  }catch(e){notify('Catalog quality unavailable: '+e.message,true)}
 }
+async function showDeliveryZones(seller=true){
+ try{
+  const path=seller?'/api/seller/delivery/zones':'/api/admin/delivery/zones';
+  const zones=await request(path);
+  const d=$('modal'),root=$('modalContent');if(d.open)d.close();root.replaceChildren();
+  const heading=document.createElement('h2');heading.textContent=seller?'SELLER DELIVERY PINCODES':'PLATFORM DELIVERY PINCODES';root.append(heading);
+  const info=document.createElement('p');info.textContent='Configure only verified delivery ranges. Dispatch city alone does not prove delivery coverage. Seller-estimated dates are not courier guarantees.';root.append(info);
+  if(!zones.length){const empty=document.createElement('p');empty.textContent='No delivery ranges configured. Customers will see coverage as unverified.';root.append(empty)}
+  for(const zone of zones){
+   const section=document.createElement('section');section.className='review-card';
+   const h=document.createElement('strong');h.textContent=zone.pinFrom+' – '+zone.pinTo+' · '+(zone.enabled?'ACTIVE':'DISABLED');
+   const p=document.createElement('p');p.textContent=zone.etaMinDays+'–'+zone.etaMaxDays+' estimated days';
+   section.append(h,p);
+   if(zone.enabled){
+    const button=document.createElement('button');button.type='button';button.textContent='DISABLE ZONE';
+    button.onclick=async()=>{
+     d.close();
+     try{await request(path+'/'+zone.id,{method:'DELETE'});notify('Delivery zone disabled.')}
+     catch(e){notify('Could not disable: '+e.message,true)}
+     showDeliveryZones(seller);
+    };section.append(button);
+   }
+   root.append(section);
+  }
+  const add=document.createElement('button');add.type='button';add.className='primary-choice';add.textContent='+ ADD DELIVERY PIN RANGE';
+  add.onclick=async()=>{
+   d.close();
+   const input=await showDialog('VERIFIED DELIVERY COVERAGE',[
+    {name:'pinFrom',label:'FIRST PIN CODE',placeholder:'560001',minLength:6},
+    {name:'pinTo',label:'LAST PIN CODE',placeholder:'560099',minLength:6},
+    {name:'etaMinDays',label:'MIN DELIVERY DAYS',type:'number',value:'2'},
+    {name:'etaMaxDays',label:'MAX DELIVERY DAYS',type:'number',value:'5'}
+   ],'ADD DELIVERY ZONE');
+   if(!input){showDeliveryZones(seller);return}
+   try{
+    await request(path,{method:'POST',body:JSON.stringify({
+     pinFrom:input.pinFrom,pinTo:input.pinTo,
+     etaMinDays:Number(input.etaMinDays),etaMaxDays:Number(input.etaMaxDays)
+    })});notify('Delivery zone added.');
+   }catch(e){notify('Cannot add delivery zone: '+e.message,true)}
+   showDeliveryZones(seller);
+  };root.append(add);
+  const close=document.createElement('button');close.type='button';close.textContent='CLOSE';close.onclick=()=>d.close();root.append(close);
+  d.showModal();
+ }catch(e){notify('Delivery zones unavailable: '+e.message,true)}
+}
 async function showInventoryPanel(seller){
  try{
   const group=seller?'seller':'admin';
@@ -1888,7 +1938,9 @@ async function showInventoryPanel(seller){
    const corrections=document.createElement('button');corrections.type='button';
    corrections.textContent='CATALOG CORRECTION REQUESTS';
    corrections.onclick=()=>{d.close();showSellerCorrections()};
-   buttons.append(orders,store,corrections);root.append(buttons);
+   const deliveryBtn=document.createElement('button');deliveryBtn.type='button';
+   deliveryBtn.textContent='DELIVERY PINCODES';deliveryBtn.onclick=()=>{d.close();showDeliveryZones(true)};
+   buttons.append(orders,store,corrections,deliveryBtn);root.append(buttons);
   }
   const create=document.createElement('button');create.type='button';create.className='primary-choice';
   create.textContent='+ ADD PRODUCT TO CATALOG';create.onclick=()=>{d.close();createInventoryListing(seller)};
