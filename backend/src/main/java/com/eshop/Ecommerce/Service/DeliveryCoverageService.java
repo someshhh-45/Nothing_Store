@@ -29,10 +29,15 @@ public class DeliveryCoverageService {
    throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Enter a valid 6-digit Indian PIN");
   Long sellerId=product.getUser()==null?null:product.getUser().getUserid();
   Long key=sellerId==null?0L:sellerId;
-  List<DeliveryCoverageZone> active=zones.findBySellerKeyOrderByPinFromAsc(key).stream()
+  List<DeliveryCoverageZone> configured=zones.findBySellerKeyOrderByPinFromAsc(key);
+  List<DeliveryCoverageZone> active=configured.stream()
    .filter(DeliveryCoverageZone::isEnabled).toList();
+  // A seller who disabled all zones has suspended delivery, not opted out of checks.
+  if(!configured.isEmpty()&&active.isEmpty())
+   return new Result(product.getProductId(),sellerId,pincode,"UNAVAILABLE",false,
+     null,null,"Seller has disabled delivery to all configured postal zones");
   // No optimistic claims about courier services or ETA when zones are unconfigured.
-  if(active.isEmpty())
+  if(configured.isEmpty())
    return new Result(product.getProductId(),sellerId,pincode,"UNVERIFIED",!requireConfigured,
      null,null,"Seller has not configured a delivery network for this PIN");
   var selected=active.stream()
