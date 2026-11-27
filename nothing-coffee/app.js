@@ -569,7 +569,7 @@ async function loadSession(){
 }
 function showDialog(title,fields,button='CONTINUE'){
  return new Promise(resolve=>{
-  const dialog=$('modal'),root=$('modalContent');root.replaceChildren();
+  const dialog=$('modal'),root=$('modalContent');dialog.oncancel=null;root.replaceChildren();
   const h=document.createElement('h2');h.textContent=title;root.appendChild(h);
   const form=document.createElement('form'),inputs={};
   let consentedCoordinates=null;
@@ -641,7 +641,7 @@ function showDialog(title,fields,button='CONTINUE'){
 }
 function selectAccountMode(){
  return new Promise(resolve=>{
-  const dialog=$('modal'),root=$('modalContent');root.replaceChildren();
+  const dialog=$('modal'),root=$('modalContent');dialog.oncancel=null;root.replaceChildren();
   const title=document.createElement('h2');title.textContent='YOUR NOTHING ACCOUNT';root.append(title);
   const p=document.createElement('p');p.textContent='Choose how you want to continue.';root.append(p);
   const actions=document.createElement('div');actions.className='account-choices';root.append(actions);
@@ -751,7 +751,7 @@ async function adminReviewQueue(seller){
  try{
   const url=seller?'/api/admin/seller-applications':'/api/admin/seller-listings';
   const items=await request(url);
-  const d=$('modal'),root=$('modalContent');if(d.open)d.close();root.replaceChildren();
+  const d=$('modal'),root=$('modalContent');if(d.open)d.close();d.oncancel=null;root.replaceChildren();
   const heading=document.createElement('h2');
   heading.textContent=seller?'SELLER APPLICATIONS':'PENDING PRODUCT LISTINGS';root.append(heading);
   const instructions=document.createElement('p');
@@ -830,7 +830,7 @@ async function retailerAction(){
 }
 function informationModal(title,message){
  return new Promise(resolve=>{
-  const d=$('modal'),root=$('modalContent');root.replaceChildren();
+  const d=$('modal'),root=$('modalContent');d.oncancel=null;root.replaceChildren();
   const heading=document.createElement('h2');heading.textContent=title;
   const p=document.createElement('p');p.textContent=message;
   const done=document.createElement('button');done.className='outline-button';done.textContent='CLOSE';
@@ -841,7 +841,7 @@ function informationModal(title,message){
 async function reviewRetailers(){
  try{
   const items=await request('/api/admin/retailers');
-  const d=$('modal'),root=$('modalContent');root.replaceChildren();
+  const d=$('modal'),root=$('modalContent');d.oncancel=null;root.replaceChildren();
   const heading=document.createElement('h2');heading.textContent='RETAILER APPROVAL QUEUE';root.append(heading);
   const help=document.createElement('p');help.textContent='Use gst.gov.in > Search Taxpayer to verify the GSTIN and legal name. Approve only after successful verification.';root.append(help);
   if(!items.length){const empty=document.createElement('p');empty.textContent='No pending retailer applications.';root.append(empty)}
@@ -880,7 +880,7 @@ const stageOptions={
 async function showTracking(orderId,admin=false){
  try{
   const data=await request((admin?'/api/admin/orders/':'/api/customer/orders/')+encodeURIComponent(orderId)+'/tracking');
-  const d=$('modal'),root=$('modalContent');if(d.open)d.close();root.replaceChildren();
+  const d=$('modal'),root=$('modalContent');if(d.open)d.close();d.oncancel=null;root.replaceChildren();
   const title=document.createElement('h2');title.textContent='TRACK ORDER #'+data.orderId;
   const intro=document.createElement('p');intro.className='tracking-disclaimer';
   intro.textContent='These are store-confirmed fulfillment updates. Live courier GPS/scans are not connected.';
@@ -964,7 +964,7 @@ async function showFulfillmentPanel(){
  try{
   const data=await request('/api/admin/orders?pageNumber=0&pageSize=50&sortBy=orderId&sortOrder=desc');
   const orders=Array.isArray(data.content)?data.content:[];
-  const d=$('modal'),root=$('modalContent');if(d.open)d.close();root.replaceChildren();
+  const d=$('modal'),root=$('modalContent');if(d.open)d.close();d.oncancel=null;root.replaceChildren();
   const title=document.createElement('h2');title.textContent='ORDER FULFILLMENT';root.append(title);
   const caption=document.createElement('p');caption.textContent='Authorized staff only. Select an order to add a verified store milestone. This does not connect to a courier.';root.append(caption);
   if(!orders.length){const e=document.createElement('p');e.textContent='No customer orders yet.';root.append(e)}
@@ -985,7 +985,7 @@ async function showOrders(){
  try{
   const data=await request('/api/customer/orders');
   const orders=Array.isArray(data)?data:[];
-  const d=$('modal'),root=$('modalContent');if(d.open)d.close();root.replaceChildren();
+  const d=$('modal'),root=$('modalContent');if(d.open)d.close();d.oncancel=null;root.replaceChildren();
   const title=document.createElement('h2');title.textContent='YOUR ORDERS';root.append(title);
   const requestsButton=document.createElement('button');requestsButton.type='button';
   requestsButton.className='outline-button';requestsButton.textContent='MY RETURN / DELIVERY REQUESTS ↗';
@@ -1052,7 +1052,7 @@ function checkoutAddressText(a){
 }
 async function confirmCheckoutDetails(address){
  return new Promise(resolve=>{
-  const dialog=$('modal'),root=$('modalContent');root.replaceChildren();
+  const dialog=$('modal'),root=$('modalContent');dialog.oncancel=null;root.replaceChildren();
   const heading=document.createElement('h2');heading.textContent='Confirm details';
   root.append(heading);
   root.insertAdjacentHTML('beforeend',checkoutSteps(2));
@@ -1110,7 +1110,7 @@ async function choosePaymentMethod(total){
  let stripeReady=false;
  try{const config=await request('/api/checkout/stripe/config');stripeReady=config.enabled===true}catch{}
  return new Promise(resolve=>{
-  const dialog=$('modal'),root=$('modalContent');root.replaceChildren();
+  const dialog=$('modal'),root=$('modalContent');dialog.oncancel=null;root.replaceChildren();
   const h=document.createElement('h2');h.textContent='Payment method';root.append(h);
   root.insertAdjacentHTML('beforeend',checkoutSteps(3));
   const intro=document.createElement('p');intro.textContent='Choose how you want to pay. Your payment and order are confirmed by the backend.';root.append(intro);
@@ -1170,7 +1170,7 @@ async function resumeStripeCheckout(){
 async function selectDeliveryAddress(addresses){
  if(!Array.isArray(addresses)||!addresses.length)return null;
  return new Promise(resolve=>{
-  const d=$('modal'),root=$('modalContent');root.replaceChildren();
+  const d=$('modal'),root=$('modalContent');d.oncancel=null;root.replaceChildren();
   const heading=document.createElement('h2');heading.textContent='WHERE SHOULD IT GO?';root.append(heading);
   const intro=document.createElement('p');intro.textContent='Choose a saved delivery address or add another one. Your selected address is verified by Spring Boot.';root.append(intro);
   const list=document.createElement('div');list.className='address-choices';root.append(list);
@@ -1286,7 +1286,7 @@ async function showWishlist(){
  if(!user && !await login('LOGIN'))return;
  try{
   const list=await request('/api/customer/wishlist');
-  const d=$('modal'),root=$('modalContent');if(d.open)d.close();root.replaceChildren();
+  const d=$('modal'),root=$('modalContent');if(d.open)d.close();d.oncancel=null;root.replaceChildren();
   const title=document.createElement('h2');title.textContent='YOUR SAVED OBJECTS';root.append(title);
   if(!list.length){const p=document.createElement('p');p.textContent='No saved products yet.';root.append(p)}
   for(const item of list){
@@ -1309,7 +1309,7 @@ async function showWishlist(){
 async function showReviews(productId){
  try{
   const reviews=await request('/api/store/products/'+encodeURIComponent(productId)+'/reviews');
-  const d=$('modal'),root=$('modalContent');if(d.open)d.close();root.replaceChildren();
+  const d=$('modal'),root=$('modalContent');if(d.open)d.close();d.oncancel=null;root.replaceChildren();
   const heading=document.createElement('h2');heading.textContent='CUSTOMER FEEDBACK';root.append(heading);
   if(!reviews.length){const p=document.createElement('p');p.textContent='No purchased-product feedback yet.';root.append(p)}
   for(const item of reviews){
@@ -1345,7 +1345,7 @@ async function writeReview(productId){
 async function showRecommendations(productId){
  try{
   const items=await request('/api/store/recommendations?productId='+encodeURIComponent(productId));
-  const d=$('modal'),root=$('modalContent');if(d.open)d.close();root.replaceChildren();
+  const d=$('modal'),root=$('modalContent');if(d.open)d.close();d.oncancel=null;root.replaceChildren();
   const heading=document.createElement('h2');heading.textContent='MORE LIKE THIS';root.append(heading);
   if(!items.length){const p=document.createElement('p');p.textContent='No similar in-stock products available.';root.append(p)}
   for(const item of items){
@@ -1375,7 +1375,7 @@ async function showMyRequests(){
  if(!user && !await login('LOGIN'))return;
  try{
   const items=await request('/api/customer/order-requests');
-  const d=$('modal'),root=$('modalContent');if(d.open)d.close();root.replaceChildren();
+  const d=$('modal'),root=$('modalContent');if(d.open)d.close();d.oncancel=null;root.replaceChildren();
   const heading=document.createElement('h2');heading.textContent='AFTER-SALES REQUESTS';root.append(heading);
   if(!items.length){const empty=document.createElement('p');empty.textContent='No return or rescheduling requests.';root.append(empty)}
   for(const item of items){
@@ -1394,7 +1394,7 @@ async function showMyRequests(){
 async function reviewAfterSaleRequests(){
  try{
   const items=await request('/api/admin/order-requests');
-  const d=$('modal'),root=$('modalContent');if(d.open)d.close();root.replaceChildren();
+  const d=$('modal'),root=$('modalContent');if(d.open)d.close();d.oncancel=null;root.replaceChildren();
   const heading=document.createElement('h2');heading.textContent='RETURN / DATE APPROVAL QUEUE';root.append(heading);
   const disclaimer=document.createElement('p');
   disclaimer.textContent='Approval does not issue refunds, restock products or book a courier. Finish those operations with verified fulfillment.';
@@ -1446,7 +1446,7 @@ async function matchExistingProduct(){
  try{
   await loadCatalog();
   const products=catalog.filter(p=>(p.catalogProductId??p.productId)===p.productId&&!p.variantGroup&&!p.sizeType);
-  const d=$('modal'),root=$('modalContent');if(d.open)d.close();root.replaceChildren();
+  const d=$('modal'),root=$('modalContent');if(d.open)d.close();d.oncancel=null;root.replaceChildren();
   const heading=document.createElement('h2');heading.textContent='SELL AN EXISTING PRODUCT';root.append(heading);
   const hint=document.createElement('p');hint.textContent='Choose an existing catalog item. Set your own price, stock and dispatch city. Admin approval is required before customers see your offer.';root.append(hint);
   const search=document.createElement('input');search.type='search';search.placeholder='Search existing products or brands';search.setAttribute('aria-label','Search products to sell');root.append(search);
@@ -1493,7 +1493,7 @@ async function createInventoryListing(seller){
   const response=await request('/api/public/categories?pageNumber=0&pageSize=100');
   const categories=(Array.isArray(response.content)?response.content:[])
    .filter(category=>!seller||String(category.categoryName||'').toLowerCase()!=='coffee');
-  const d=$('modal'),root=$('modalContent');if(d.open)d.close();root.replaceChildren();
+  const d=$('modal'),root=$('modalContent');if(d.open)d.close();d.oncancel=null;root.replaceChildren();
   const heading=document.createElement('h2');heading.textContent='CHOOSE A PRODUCT CATEGORY';root.append(heading);
   if(!categories.length){const info=document.createElement('p');info.textContent='No categories available. Ask a store administrator to create one.';root.append(info)}
   for(const category of categories){
@@ -1614,7 +1614,7 @@ async function editSellerProduct(product){
 async function manageSellerFulfillment(orderId,page=0){
  try{
   const state=await request('/api/seller/orders/'+encodeURIComponent(orderId)+'/fulfillment');
-  const d=$('modal'),root=$('modalContent');if(d.open)d.close();root.replaceChildren();
+  const d=$('modal'),root=$('modalContent');if(d.open)d.close();d.oncancel=null;root.replaceChildren();
   const title=document.createElement('h2');title.textContent='FULFILL ORDER #'+orderId;root.append(title);
   const current=document.createElement('p');current.textContent='YOUR SHIPMENT · '+trackingLabel(state.stage);root.append(current);
   if(state.carrier&&state.trackingNumber){
@@ -1659,7 +1659,7 @@ async function manageSellerFulfillment(orderId,page=0){
 async function customerSellerFulfillments(orderId){
  try{
   const rows=await request('/api/customer/orders/'+encodeURIComponent(orderId)+'/seller-fulfillments');
-  const d=$('modal'),root=$('modalContent');if(d.open)d.close();root.replaceChildren();
+  const d=$('modal'),root=$('modalContent');if(d.open)d.close();d.oncancel=null;root.replaceChildren();
   const title=document.createElement('h2');title.textContent='SELLER SHIPPING · ORDER #'+orderId;root.append(title);
   const disclaimer=document.createElement('p');
   disclaimer.textContent='Seller-entered shipping updates. Courier GPS and automatic delivery scans are not connected.';
@@ -1684,7 +1684,7 @@ async function customerSellerFulfillments(orderId){
 async function showSellerOrders(page=0){
  try{
   const items=await request('/api/seller/dashboard/orders?page='+encodeURIComponent(page));
-  const d=$('modal'),root=$('modalContent');if(d.open)d.close();root.replaceChildren();
+  const d=$('modal'),root=$('modalContent');if(d.open)d.close();d.oncancel=null;root.replaceChildren();
   const title=document.createElement('h2');title.textContent='YOUR SELLER ORDERS';root.append(title);
   const info=document.createElement('p');
   info.textContent='Only order lines for your own products are shown. Order value includes unpaid COD orders and is not settled revenue.';
@@ -1720,7 +1720,7 @@ async function showSellerOrders(page=0){
 async function showSellerCorrections(){
  try{
   const rows=await request('/api/seller/catalog-corrections');
-  const d=$('modal'),root=$('modalContent');if(d.open)d.close();root.replaceChildren();
+  const d=$('modal'),root=$('modalContent');if(d.open)d.close();d.oncancel=null;root.replaceChildren();
   const h=document.createElement('h2');h.textContent='SELLER CORRECTION REQUESTS';root.append(h);
   const p=document.createElement('p');p.textContent='Use Seller Dashboard → Edit Listing or Upload Photo before submitting the requested correction.';root.append(p);
   if(!rows.length){const empty=document.createElement('p');empty.textContent='No correction requests.';root.append(empty)}
@@ -1753,7 +1753,7 @@ async function showSellerCorrections(){
 async function showAdminCorrections(){
  try{
   const rows=await request('/api/admin/catalog-corrections');
-  const d=$('modal'),root=$('modalContent');if(d.open)d.close();root.replaceChildren();
+  const d=$('modal'),root=$('modalContent');if(d.open)d.close();d.oncancel=null;root.replaceChildren();
   const h=document.createElement('h2');h.textContent='SELLER CORRECTIONS';root.append(h);
   const active=rows.filter(r=>r.status==='REQUESTED'||r.status==='SUBMITTED');
   if(!active.length){const empty=document.createElement('p');empty.textContent='No active correction requests.';root.append(empty)}
@@ -1820,7 +1820,7 @@ async function linkCatalogDuplicate(source,target){
 async function showCatalogQuality(viewStatus='OPEN',viewType='ALL'){
  try{
   const report=await request('/api/admin/catalog-quality');
-  const d=$('modal'),root=$('modalContent');if(d.open)d.close();root.replaceChildren();
+  const d=$('modal'),root=$('modalContent');if(d.open)d.close();d.oncancel=null;root.replaceChildren();
   const h=document.createElement('h2');h.textContent='CATALOG QUALITY AUDIT';root.append(h);
   const intro=document.createElement('p');
   intro.textContent='Review suspected duplicate SKUs, reused photos and missing seller photos. These decisions never delete or merge inventory or change existing orders.';
@@ -1939,7 +1939,7 @@ async function showDeliveryZones(seller=true){
  try{
   const path=seller?'/api/seller/delivery/zones':'/api/admin/delivery/zones';
   const zones=await request(path);
-  const d=$('modal'),root=$('modalContent');if(d.open)d.close();root.replaceChildren();
+  const d=$('modal'),root=$('modalContent');if(d.open)d.close();d.oncancel=null;root.replaceChildren();
   const heading=document.createElement('h2');heading.textContent=seller?'SELLER DELIVERY PINCODES':'PLATFORM DELIVERY PINCODES';root.append(heading);
   const info=document.createElement('p');info.textContent='Configure only verified delivery ranges. Dispatch city alone does not prove delivery coverage. Seller-estimated dates are not courier guarantees.';root.append(info);
   if(!zones.length){const empty=document.createElement('p');empty.textContent='No delivery ranges configured. Customers will see coverage as unverified.';root.append(empty)}
@@ -1986,7 +1986,7 @@ async function showInventoryPanel(seller){
   const group=seller?'seller':'admin';
   const data=await request(seller?'/api/seller/listings':'/api/admin/products?pageNumber=0&pageSize=50');
   const products=seller?(Array.isArray(data)?data:[]):(Array.isArray(data.products)?data.products:[]);
-  const d=$('modal'),root=$('modalContent');if(d.open)d.close();root.replaceChildren();
+  const d=$('modal'),root=$('modalContent');if(d.open)d.close();d.oncancel=null;root.replaceChildren();
   const heading=document.createElement('h2');heading.textContent=seller?'SELLER INVENTORY':'MARKETPLACE INVENTORY';
   root.append(heading);
   const info=document.createElement('p');info.textContent='Manage stock and discounts directly in PostgreSQL. Listed prices and cart totals are recalculated by Spring Boot.';
@@ -2163,7 +2163,7 @@ async function loadOffers(){
 async function showOfferAdmin(){
  try{
   const offers=await request('/api/admin/offers');
-  const d=$('modal'),root=$('modalContent');if(d.open)d.close();root.replaceChildren();
+  const d=$('modal'),root=$('modalContent');if(d.open)d.close();d.oncancel=null;root.replaceChildren();
   const h=document.createElement('h2');h.textContent='CAMPAIGNS & COUPONS';root.append(h);
   const intro=document.createElement('p');intro.textContent='Create real PostgreSQL-backed offers with a cart spend range, validity and redemption limits. Discounts are rechecked at checkout.';root.append(intro);
   const create=document.createElement('button');create.className='primary-choice';create.textContent='+ CREATE OFFER';
@@ -2218,6 +2218,22 @@ async function showOfferAdmin(){
 }
 
 function bind(){
+ const modal=$('modal'),modalContent=$('modalContent');
+ // Keep existing close callbacks (including promise resolution) intact.
+ const prepareModal=()=>{
+  for(const button of modalContent.querySelectorAll('button')){
+   if(button.textContent.trim()==='CLOSE'&&(!button.form||button.type!=='submit')){
+    button.hidden=true;button.classList.add('legacy-modal-close');
+   }
+  }
+ };
+ new MutationObserver(prepareModal).observe(modalContent,{childList:true,subtree:true});
+ $('modalClose').onclick=()=>{
+  const existing=modalContent.querySelector('button.legacy-modal-close');
+  if(existing){existing.click();return}
+  const event=new Event('cancel',{cancelable:true});
+  if(modal.dispatchEvent(event)&&modal.open)modal.close();
+ };
  window.addEventListener('hashchange',routeProduct);
  $('year').textContent=new Date().getFullYear();
  $('offerTickerPrev').onclick=()=>{advanceOfferTicker(-1);startOfferTicker()};

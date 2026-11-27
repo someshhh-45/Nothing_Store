@@ -8,9 +8,9 @@
   <title>NOTHING MARKET — Everything interesting. Nothing ordinary.</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link rel="stylesheet" href="styles.css?v=delivery-pincode-20261127">
+  <link rel="stylesheet" href="styles.css?v=modal-close-2">
   <link rel="stylesheet" href="checkout-steps.css?v=1"><link rel="stylesheet" href="offers.css?v=search-cities-coupons-20261126">
-  <script src="app.js?v=product-details-1" defer></script>
+  <script src="app.js?v=modal-close-2" defer></script>
   <link rel="stylesheet" href="product-details.css?v=1">
 </head>
 <body>
@@ -51,7 +51,7 @@
   <footer class="footer"><div class="footer-top"><a class="wordmark" href="#top"><span class="mark">N.</span><span class="brand-stack">NOTHING <small>MARKET</small></span></a><span>OBJECTS WITH ATTITUDE.<br>EVERYDAY POSSIBILITIES.</span><div class="footer-links"><a href="#discover">COLLECTIONS</a><a href="#catalog">SHOP</a><a href="#retailers">FOR BUSINESS</a></div></div><div class="footer-mega">NOTHING<span>®</span></div><div class="footer-bottom"><span>© <span id="year"></span> NOTHING MARKET / DEMO</span><span>IMAGES: <a href="https://unsplash.com/license" target="_blank" rel="noopener noreferrer">UNSPLASH LICENCE</a> · ILLUSTRATIVE ONLY</span><span>BUILT WITH SPRING BOOT ↗</span></div></footer>
   <div id="overlay" class="overlay" hidden></div>
   <aside id="cartDrawer" class="cart-drawer" role="dialog" aria-modal="true" aria-label="Your shopping bag" aria-hidden="true"><div class="drawer-top"><span class="eyebrow">THE GOOD STUFF YOU FOUND</span><button class="close-button" id="closeCart" aria-label="Close cart">✕</button><h2>YOUR BAG<span>.</span></h2><p id="cartSyncStatus">Cart ready</p></div><div id="cartItems" class="cart-items"></div><div class="drawer-bottom"><div class="total-line"><span>SUBTOTAL</span><strong id="cartTotal">₹0</strong></div><div class="coupon-controls"><label for="couponInput">HAVE A COUPON?</label><div class="coupon-input-row"><input id="couponInput" type="text" maxlength="32" autocomplete="off" placeholder="ENTER PROMO CODE"><button id="applyCouponBtn" type="button">APPLY</button><button id="removeCouponBtn" type="button" hidden>REMOVE</button></div><p id="couponStatus" role="status" aria-live="polite">Sign in to apply offers.</p></div><div id="couponSavingsLine" class="total-line promo-savings" hidden><span>YOU SAVE</span><strong id="couponSavings">₹0</strong></div><div class="total-line promo-payable"><span>ESTIMATED TOTAL</span><strong id="cartPayable">₹0</strong></div><p>Final availability and totals are checked by the server. Cash on delivery is available for the demonstration; Stripe needs test credentials.</p><button id="checkoutBtn" class="checkout-button">SECURE CHECKOUT ↗</button></div></aside>
-  <dialog id="modal" class="modal" aria-label="Account and checkout"><div id="modalContent"></div></dialog>
+  <dialog id="modal" class="modal" aria-label="Account and checkout"><div class="modal-close-bar"><button id="modalClose" type="button" aria-label="Close dialog" title="Close">×</button></div><div id="modalContent"></div></dialog>
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
 </body>
 </html>
