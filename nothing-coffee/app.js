@@ -233,6 +233,7 @@ function showQuickView(id){
  const add=document.createElement('button');add.className='primary-choice';
  const close=document.createElement('button');close.className='outline-button';close.textContent='CLOSE';close.onclick=()=>dialog.close();
  function renderSelection(){
+  deliverySequence++;deliveryMessage.textContent='';
   soldBy.textContent='SOLD BY · '+sellerLabel(selected);
   price.textContent=money(itemPrice(selected));
   stock.textContent=selected.city+' · '+selected.stock+' in stock'+(selected.footLengthCm?' · approx. foot length '+selected.footLengthCm+' cm':'');
@@ -275,6 +276,27 @@ function showQuickView(id){
   age.textContent='Age/safety warning: manufacturer rating not verified. Adults should check packaging before purchase.';
   optionsWrap.append(age);
  }
+ const deliveryBox=document.createElement('div');deliveryBox.className='quick-delivery-check';
+ const deliveryLabel=document.createElement('label');deliveryLabel.textContent='CHECK DELIVERY PIN';
+ const deliveryPin=document.createElement('input');deliveryPin.type='text';deliveryPin.inputMode='numeric';
+ deliveryPin.maxLength=6;deliveryPin.placeholder='560001';deliveryPin.setAttribute('aria-label','Delivery PIN code');
+ const deliveryButton=document.createElement('button');deliveryButton.type='button';deliveryButton.textContent='CHECK';
+ const deliveryMessage=document.createElement('p');deliveryMessage.setAttribute('aria-live','polite');
+ let deliverySequence=0;
+ deliveryButton.onclick=async()=>{
+  const pin=deliveryPin.value.trim(),sequence=++deliverySequence;
+  if(!/^[1-9][0-9]{5}$/.test(pin)){deliveryMessage.textContent='Enter a valid six-digit Indian PIN.';return}
+  deliveryMessage.textContent='Checking delivery coverage…';
+  try{
+   const r=await request('/api/store/delivery/check?productId='+encodeURIComponent(selected.productId)+'&pincode='+encodeURIComponent(pin));
+   if(sequence!==deliverySequence)return;
+   deliveryMessage.textContent=r.status==='SERVICEABLE'?
+    'Delivery configured · estimated '+r.minDays+'–'+r.maxDays+' days (seller estimate)':
+    r.status==='UNAVAILABLE'?'Not deliverable to '+pin+' from this seller.':
+    'Delivery coverage has not been verified for this seller.';
+  }catch(e){if(sequence===deliverySequence)deliveryMessage.textContent='Delivery check error: '+e.message}
+ };
+ deliveryBox.append(deliveryLabel,deliveryPin,deliveryButton,deliveryMessage);
  const details=document.createElement('p');details.className='size-guide';
  details.textContent='Item stock and price are verified by Spring Boot at checkout. Photos are representative.';
  add.onclick=async()=>{
@@ -288,7 +310,7 @@ function showQuickView(id){
  reviews.textContent='READ / WRITE REVIEWS';reviews.onclick=()=>{dialog.close();showReviews(selected.productId)};
  const similar=document.createElement('button');similar.type='button';similar.className='outline-button';
  similar.textContent='SIMILAR PICKS ↗';similar.onclick=()=>{dialog.close();showRecommendations(selected.productId)};
- info.append(heading,desc,soldBy,optionsWrap,stock,price,details,add,save,reviews,similar,close);panel.append(picture,info);root.append(panel);
+ info.append(heading,desc,soldBy,optionsWrap,stock,price,deliveryBox,details,add,save,reviews,similar,close);panel.append(picture,info);root.append(panel);
  renderSelection();dialog.showModal();
 }
 function drawProducts(){
@@ -1155,7 +1177,17 @@ async function checkout(){
    if(!/^[6-9][0-9]{9}$/.test(address.phoneNumber||'')){
     notify('The delivery address needs a valid mobile number.',true);continue;
    }
-   let backToAddress=false;
+   checkoutStage='checking seller delivery eligibility';
+    const eligibility=await request('/api/customer/delivery/cart?addressId='+encodeURIComponent(address.addressId));
+    if(!eligibility.checkoutAllowed){
+     const rejected=eligibility.products.filter(p=>!p.checkoutAllowed).map(p=>'SKU #'+p.productId).join(', ');
+     notify('This address cannot receive '+rejected+'. Select another delivery PIN.',true);
+     continue;
+    }
+    if(!eligibility.allVerified){
+     notify('Some delivery zones have not been verified. Confirm availability before payment.');
+    }
+    let backToAddress=false;
    while(!backToAddress){
     checkoutStage='reviewing order details';
     const review=await confirmCheckoutDetails(address);
