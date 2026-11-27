@@ -96,7 +96,9 @@ class DeliveryCoverageIntegrationTest {
   assertEquals(1,items.findAll().stream().filter(i->i.getProduct().getProductId().equals(p.getProductId())).count());
 
   address.setPincode("560015");addresses.saveAndFlush(address);
-  assertTrue(coverage.checkCart(carts.findCartByEmail(buyer.getEmail()),"560015").checkoutAllowed());
+  mvc.perform(get("/api/customer/delivery/cart").param("addressId",deliveryAddressId.toString())
+    .with(user(buyer.getUserName()).roles("USER")))
+    .andExpect(status().isOk()).andExpect(jsonPath("$.checkoutAllowed").value(true));
 
   mvc.perform(delete(sellerPath+"/"+zoneId).with(user(seller.getUserName()).roles("SELLER")))
    .andExpect(status().isOk());
