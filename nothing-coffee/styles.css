@@ -105,3 +105,10 @@
 .catalog-audit-listing img{width:86px;height:82px;flex-shrink:0;object-fit:contain;background:#f5f5f3;border:1px solid #e7e7e1}
 .catalog-audit-listing p{margin:0;overflow-wrap:anywhere}
 @media(max-width:520px){.catalog-audit-listing img{width:58px;height:58px}.catalog-audit-filters select{min-width:100%}}
+
+/* Seller-specific delivery PIN preview in product detail dialog. */
+.quick-delivery-check{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:10px 0;padding:12px;border:1px solid #cdd9c8;background:#f6f8f4}
+.quick-delivery-check label{font-size:11px;font-weight:800;letter-spacing:.05em;flex-basis:100%}
+.quick-delivery-check input{max-width:135px;flex:1;padding:10px;border:1px solid #b3bdaf}
+.quick-delivery-check button{padding:10px 14px;border:1px solid #192b1e;background:#192b1e;color:white;font-weight:700;cursor:pointer}
+.quick-delivery-check p{flex-basis:100%;font-size:12px;margin:2px 0 0;color:#344f3d}
