@@ -66,6 +66,8 @@ public class OrderServiceImpl implements OrderService {
     org.springframework.jdbc.core.JdbcTemplate emailDeliveryJdbc;
     @Autowired
     OrderTrackingService tracking;
+    @Autowired
+    com.eshop.Ecommerce.Service.DeliveryCoverageService deliveryCoverage;
 
     @Override
     @Transactional
@@ -96,6 +98,9 @@ public class OrderServiceImpl implements OrderService {
         if(address.getUser()==null || !emailId.equalsIgnoreCase(address.getUser().getEmail())) {
             throw new APIException("Shipping address does not belong to the current customer");
         }
+        // Verify the actual chosen delivery PIN against each seller's configured zone.
+        // Runs again during signed Stripe webhook fulfillment, not just at payment initiation.
+        deliveryCoverage.requireCheckout(cart,address.getPincode());
         // Calculate server-authoritative subtotal and coupon from persisted cart items.
         CartOfferService.Quote quote=offerPricing.quote(cart,emailId,true);
         if(quote.total()<=0)throw new APIException("Cannot place a zero-value order");
