@@ -208,11 +208,33 @@ function productVariants(p){
  const rank=x=>x.sizeType==='SHOE'?Number(String(x.variantLabel).replace('UK ','')) : ['XS','S','M','L','XL','XXL'].indexOf(x.variantLabel);
  return options.sort((a,b)=>rank(a)-rank(b));
 }
+let detailVersion=0;
+const detailHomeTitle=document.title;
+function routeProduct(){
+ const match=location.hash.match(/^#product\/(\d+)$/);
+ const page=$('productDetails');
+ if(match&&catalog.length){renderProductPage(match[1]);return}
+ if(!match&&page&&!page.hidden){
+  detailVersion++;page.hidden=true;page.replaceChildren();
+  document.body.classList.remove('product-page-open');document.title=detailHomeTitle;
+  if(location.hash==='#catalog')$('catalog').scrollIntoView();
+ }
+}
 function showQuickView(id){
- const p=productById(id);if(!p)return;
- const variants=productVariants(p);let selected=variants.find(v=>v.stock>0)||variants[0];
+ if(!productById(id))return;
+ const hash='#product/'+encodeURIComponent(id);
+ if(location.hash===hash)renderProductPage(id);else location.hash=hash;
+}
+function renderProductPage(id){
+ const p=productById(id),root=$('productDetails');
+ const version=++detailVersion;
+ root.replaceChildren();root.hidden=false;document.body.classList.add('product-page-open');
+ window.scrollTo(0,0);
+ if(!p){root.textContent='Product no longer available. ';const back=document.createElement('a');back.href='#catalog';back.textContent='Back to catalog';root.append(back);return}
+ document.title=p.name+' | Nothing Market';
+ const variants=productVariants(p);let selected=p;
  const multipleSellers=!p.variantGroup&&variants.length>1;
- const dialog=$('modal'),root=$('modalContent');root.replaceChildren();
+ const breadcrumb=document.createElement('a');breadcrumb.href='#catalog';breadcrumb.textContent='← BACK TO COLLECTION';root.append(breadcrumb);
  const title=document.createElement('h2');title.textContent='THE DETAIL / '+(p.brand||'NOTHING SELECT');root.append(title);
  const panel=document.createElement('div');panel.className='quick-panel';
  const picture=document.createElement('div');picture.className='quick-photo';
@@ -231,7 +253,7 @@ function showQuickView(id){
  const sizeGuide=document.createElement('p');sizeGuide.className='size-guide';
  const optionButtons=document.createElement('div');optionButtons.className='size-options';
  const add=document.createElement('button');add.className='primary-choice';
- const close=document.createElement('button');close.className='outline-button';close.textContent='CLOSE';close.onclick=()=>dialog.close();
+ const buy=document.createElement('button');buy.className='outline-button';buy.textContent='BUY NOW';
  function renderSelection(){
   deliverySequence++;deliveryMessage.textContent='';
   soldBy.textContent='SOLD BY · '+sellerLabel(selected);
@@ -239,7 +261,7 @@ function showQuickView(id){
   stock.textContent=selected.city+' · '+selected.stock+' in stock'+(selected.footLengthCm?' · approx. foot length '+selected.footLengthCm+' cm':'');
   add.textContent=selected.stock>0?'ADD '+selected.variantLabel?.toUpperCase?.()+' TO BAG ↗':'SOLD OUT';
   if(!selected.variantLabel)add.textContent=selected.stock>0?'ADD TO BAG ↗':'SOLD OUT';
-  add.disabled=selected.stock<=0;
+  add.disabled=selected.stock<=0;buy.disabled=add.disabled;
   for(const b of optionButtons.querySelectorAll('button')){
    const v=variants.find(x=>String(x.productId)===b.dataset.variant);
    b.classList.toggle('selected',v===selected);
@@ -301,17 +323,41 @@ function showQuickView(id){
  details.textContent='Item stock and price are verified by Spring Boot at checkout. Photos are representative.';
  add.onclick=async()=>{
   const picked=selected;
-  dialog.close();
   await addItem(picked.productId);
  };
  const save=document.createElement('button');save.type='button';save.className='outline-button';save.textContent='♡ SAVE TO WISHLIST';
- save.onclick=async()=>{const id=selected.productId;dialog.close();await saveToWishlist(id)};
+ save.onclick=async()=>{await saveToWishlist(selected.productId)};
+ buy.onclick=async()=>{if(await changeQty(selected.productId,1))await checkout()};
  const reviews=document.createElement('button');reviews.type='button';reviews.className='outline-button';
- reviews.textContent='READ / WRITE REVIEWS';reviews.onclick=()=>{dialog.close();showReviews(selected.productId)};
+ reviews.textContent='READ / WRITE REVIEWS';reviews.onclick=()=>showReviews(selected.productId);
  const similar=document.createElement('button');similar.type='button';similar.className='outline-button';
- similar.textContent='SIMILAR PICKS ↗';similar.onclick=()=>{dialog.close();showRecommendations(selected.productId)};
- info.append(heading,desc,soldBy,optionsWrap,stock,price,deliveryBox,details,add,save,reviews,similar,close);panel.append(picture,info);root.append(panel);
- renderSelection();dialog.showModal();
+ similar.textContent='SIMILAR PICKS ↓';similar.onclick=()=>related.scrollIntoView({behavior:'smooth'});
+ info.append(heading,desc,soldBy,optionsWrap,stock,price,deliveryBox,details,add,buy,save,reviews,similar);panel.append(picture,info);root.append(panel);
+ const related=document.createElement('section');related.className='pdp-related';
+ const relatedTitle=document.createElement('h2');relatedTitle.textContent='SIMILAR PRODUCTS';related.append(relatedTitle);
+ const grid=document.createElement('div');grid.className='pdp-grid';related.append(grid);root.append(related);
+ const key=x=>String(x.variantGroup||x.catalogProductId||x.productId);
+ const seen=new Set([key(p)]);
+ function displayRelated(items){
+  grid.replaceChildren();
+  for(const candidate of items){
+   const x=productById(candidate.productId);
+   if(!x||x.category!==p.category||x.stock<=0||seen.has(key(x)))continue;
+   seen.add(key(x));
+   const a=document.createElement('a');a.className='pdp-card';a.href='#product/'+x.productId;
+   const photo=document.createElement('div');photo.className='pdp-card-photo';
+   if(canShowProductPhoto(x)){const img=document.createElement('img');img.src=x.image;img.alt=x.name;img.loading='lazy';img.onerror=()=>{photo.textContent=chooseIcon(x)};photo.append(img)}else photo.textContent=chooseIcon(x);
+   const name=document.createElement('strong');name.textContent=x.variantGroup||x.name;
+   const amount=document.createElement('span');amount.textContent=money(itemPrice(x));
+   a.append(photo,name,amount);grid.append(a);if(grid.children.length>=12)break;
+  }
+  if(!grid.children.length)grid.textContent='No similar in-stock products available.';
+ }
+ grid.textContent='Loading similar products…';
+ request('/api/store/recommendations?productId='+encodeURIComponent(id)).then(items=>{
+  if(version===detailVersion)displayRelated(Array.isArray(items)?items:[]);
+ }).catch(()=>{if(version===detailVersion)displayRelated(catalog.filter(x=>x.category===p.category).sort((a,b)=>Number(b.brand===p.brand)-Number(a.brand===p.brand)))});
+ renderSelection();
 }
 function drawProducts(){
  // Each variant has its own stock-bearing Product ID, but shoppers see one card per design.
@@ -330,9 +376,10 @@ function drawProducts(){
   if(p.image&&canShowProductPhoto(p))image='<img data-product-image="'+safeId+'" loading="lazy" decoding="async" src="'+escape(p.image)+'" alt="'+escape(p.variantGroup||p.name)+' — illustrative photography">';
   const action=stock<1?'SOLD OUT':sized?'CHOOSE SIZE ↗':multiSeller?'COMPARE SELLERS ↗':'ADD TO BAG +';
   return '<article class="product-card"><div class="product-visual" style="--tone:'+(tones[p.category]||'#e7f0ed')+'"><span class="tag">'+(stock>0?'● IN STOCK':'SOLD OUT')+'</span>'+image+
-   '<button type="button" class="quick-view" data-quick="'+safeId+'" aria-label="Quick view '+escape(p.variantGroup||p.name)+'">QUICK VIEW ↗</button></div><div class="product-info"><button type="button" class="save-button" data-save="'+safeId+'" aria-label="Save to wishlist">♡ SAVE</button><div class="brand-tag">'+escape(p.brand||'NOTHING SELECT')+'</div><div class="meta"><span>'+escape(p.category)+'</span><span>⌖ '+escape(p.city||'India')+'</span></div><h3>'+escape(p.variantGroup||p.name)+'</h3><p class="seller-byline">SOLD BY · '+escape(sellerLabel(p))+'</p><p class="description">'+escape(p.description)+'</p><div class="product-bottom"><strong class="price">'+money(itemPrice(p))+'</strong><button class="add-button" data-add="'+safeId+'" '+(stock<1?'disabled':'')+'>'+action+'</button></div></div></article>';
+   '<button type="button" class="quick-view" data-quick="'+safeId+'" aria-label="View product '+escape(p.variantGroup||p.name)+'">VIEW PRODUCT ↗</button></div><div class="product-info"><button type="button" class="save-button" data-save="'+safeId+'" aria-label="Save to wishlist">♡ SAVE</button><div class="brand-tag">'+escape(p.brand||'NOTHING SELECT')+'</div><div class="meta"><span>'+escape(p.category)+'</span><span>⌖ '+escape(p.city||'India')+'</span></div><h3><a href="#product/'+safeId+'">'+escape(p.variantGroup||p.name)+'</a></h3><p class="seller-byline">SOLD BY · '+escape(sellerLabel(p))+'</p><p class="description">'+escape(p.description)+'</p><div class="product-bottom"><strong class="price">'+money(itemPrice(p))+'</strong><button class="add-button" data-add="'+safeId+'" '+(stock<1?'disabled':'')+'>'+action+'</button></div></div></article>';
  }).join('');
  bindImageFallbacks($('productGrid'));
+ $('productGrid').querySelectorAll('.product-visual').forEach(el=>el.onclick=e=>{if(!e.target.closest('button'))showQuickView(el.querySelector('[data-quick]').dataset.quick)});
  document.querySelectorAll('[data-add]').forEach(b=>b.onclick=()=>{
   const p=productById(b.dataset.add);if(p&&productVariants(p).length>1)showQuickView(p.productId);
   else addItem(b.dataset.add);
@@ -409,6 +456,7 @@ async function applyFilters(){
 }
 
 function setCategory(name){
+ if(location.hash.startsWith('#product/'))location.hash='#catalog';
  category=name;
  document.querySelectorAll('[data-category]').forEach(x=>x.classList.toggle('active',x.dataset.category===name));
  document.querySelector('#catalog').scrollIntoView({behavior:'smooth'});
@@ -458,7 +506,7 @@ async function loadCatalog(attempt=0){
   }
   setupFilters();
   if($('heroProductCount'))$('heroProductCount').textContent=catalog.length+'+';
-  await applyFilters();updateCart();
+  await applyFilters();updateCart();routeProduct();
  }catch(e){
   if(attempt<4){
    $('sourceStatus').textContent='● WAITING FOR API…';
@@ -2170,6 +2218,7 @@ async function showOfferAdmin(){
 }
 
 function bind(){
+ window.addEventListener('hashchange',routeProduct);
  $('year').textContent=new Date().getFullYear();
  $('offerTickerPrev').onclick=()=>{advanceOfferTicker(-1);startOfferTicker()};
  $('offerTickerNext').onclick=()=>{advanceOfferTicker(1);startOfferTicker()};
@@ -2198,7 +2247,7 @@ function bind(){
  $('sellerApplyBtn').onclick=applyToSell;
  $('adminSellerAppsBtn').onclick=()=>adminReviewQueue(true);
  $('adminSellerListingsBtn').onclick=()=>adminReviewQueue(false);
- $('searchGo').onclick=()=>{searchText=$('search').value.trim();applyFilters();$('catalog').scrollIntoView({behavior:'smooth'})};
+ $('searchGo').onclick=()=>{if(location.hash.startsWith('#product/'))location.hash='#catalog';searchText=$('search').value.trim();applyFilters();$('catalog').scrollIntoView({behavior:'smooth'})};
  $('search').addEventListener('keydown',e=>{if(e.key==='Enter'){clearTimeout(searchDebounce);$('searchGo').click()}});
  $('search').addEventListener('input',()=>{clearTimeout(searchDebounce);searchDebounce=setTimeout(()=>{searchText=$('search').value.trim();applyFilters()},350)});
  $('search').addEventListener('search',()=>{searchText=$('search').value.trim();applyFilters()});
