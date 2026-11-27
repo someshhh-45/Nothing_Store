@@ -89,7 +89,8 @@ class DeliveryCoverageIntegrationTest {
   mvc.perform(get("/api/customer/delivery/cart").param("addressId",address.getAddressId().toString())
     .with(user(other.getUserName()).roles("USER"))).andExpect(status().isNotFound());
 
-  assertThrows(RuntimeException.class,()->orders.placeOrder(buyer.getEmail(),address.getAddressId(),
+  final Long deliveryAddressId=address.getAddressId();
+  assertThrows(RuntimeException.class,()->orders.placeOrder(buyer.getEmail(),deliveryAddressId,
     "COD","COD",null,"PENDING","Pay at delivery"));
   assertEquals(5,products.findById(p.getProductId()).orElseThrow().getQuantity());
   assertEquals(1,items.findAll().stream().filter(i->i.getProduct().getProductId().equals(p.getProductId())).count());
