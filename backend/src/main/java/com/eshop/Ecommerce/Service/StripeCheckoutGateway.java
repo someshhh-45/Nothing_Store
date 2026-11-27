@@ -28,17 +28,20 @@ public class StripeCheckoutGateway {
  private final AuthUtil auth;
  private final OrderService orders;
  private final CartOfferService offerPricing;
+ private final DeliveryCoverageService deliveryCoverage;
  private final String key,webhookSecret,successUrl,cancelUrl;
  private final ObjectMapper json;
 
  public StripeCheckoutGateway(CartRepository carts,AddressRepository addresses,
-  StripeCheckoutAttemptRepository attempts,AuthUtil auth,OrderService orders,CartOfferService offerPricing,ObjectMapper json,
+  StripeCheckoutAttemptRepository attempts,AuthUtil auth,OrderService orders,CartOfferService offerPricing,
+  DeliveryCoverageService deliveryCoverage,ObjectMapper json,
   @Value("${stripe.secret.key:}") String key,
   @Value("${stripe.webhook.secret:}") String webhookSecret,
   @Value("${stripe.success.url}") String successUrl,
   @Value("${stripe.cancel.url}") String cancelUrl){
   this.carts=carts;this.addresses=addresses;this.attempts=attempts;
-  this.auth=auth;this.orders=orders;this.offerPricing=offerPricing;this.json=json;
+  this.auth=auth;this.orders=orders;this.offerPricing=offerPricing;
+  this.deliveryCoverage=deliveryCoverage;this.json=json;
   this.key=key;this.webhookSecret=webhookSecret;this.successUrl=successUrl;this.cancelUrl=cancelUrl;
  }
 
@@ -76,6 +79,7 @@ public class StripeCheckoutGateway {
   Cart cart=carts.findCartByEmail(buyer.getEmail());
   if(cart==null||cart.getCartItems().isEmpty())
    throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Cart is empty");
+  deliveryCoverage.requireCheckout(cart,address.getPincode());
   List<CartItem> items=new ArrayList<>(cart.getCartItems());
   CartOfferService.Quote quote=offerPricing.quote(cart,buyer.getEmail(),true);
   boolean discounted=quote.applied()&&quote.discount()>0;
