@@ -29,6 +29,28 @@ services:
         value: "true"
       - key: SEED_COFFEE_CATALOG
         value: "false"
+      - key: FRONTEND_URL
+        sync: false
+      - key: KAFKA_BOOTSTRAP_SERVERS
+        sync: false
+      - key: KAFKA_SECURITY_PROTOCOL
+        value: SASL_SSL
+      - key: KAFKA_SASL_MECHANISM
+        value: SCRAM-SHA-256
+      - key: KAFKA_SASL_JAAS_CONFIG
+        sync: false
+      - key: OPENSEARCH_URL
+        sync: false
+      - key: OPENSEARCH_USER
+        sync: false
+      - key: OPENSEARCH_PASSWORD
+        sync: false
+      - key: RABBITMQ_HOST
+        sync: false
+      - key: RABBITMQ_USER
+        sync: false
+      - key: RABBITMQ_PASSWORD
+        sync: false
       - key: MAIL_NOTIFICATIONS_ENABLED
         value: "false"
       - key: RETAILER_DISCOUNT_PERCENT

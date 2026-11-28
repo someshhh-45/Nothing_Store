@@ -1,0 +1,10 @@
+.git
+**/.env
+**/.env.*
+**/target
+**/node_modules
+**/*.pem
+**/*.key
+**/*.tfstate*
+**/.terraform
+**/*.log
